@@ -14,14 +14,39 @@ class BancoDeDados:
             con = self.conectar()
             cursor = con.cursor()
 
-            # Tabela de perfis de usuário
             cursor.execute("""
-            CREATE TABLE IF NOT EXISTS perfis (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL UNIQUE,
-                descricao TEXT
-            );
-            """)
+                        CREATE TABLE IF NOT EXISTS jogador (
+                            id_jogador INTEGER PRIMARY KEY AUTOINCREMENT,
+                            nome TEXT NOT NULL,
+                            id_fase INTEGER,
+                            social INTEGER DEFAULT 0,
+                            dinheiro REAL DEFAULT 0.0,
+                            backend INTEGER DEFAULT 0,
+                            frontend INTEGER DEFAULT 0,
+                            FOREIGN KEY (id_fase) REFERENCES fase(id_fase)
+                        );
+                    """)
+
+            cursor.execute("""
+                                CREATE TABLE IF NOT EXISTS fase (
+                                    id_fase INTEGER PRIMARY KEY AUTOINCREMENT,
+                                tipo_fase TEXT NOT NULL,
+                                    topico TEXT NOT NULL,
+                                    introdução TEXT NOT NULL
+                                );
+                                """)
+            cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS exercicio (
+                                id_exercicio INTEGER PRIMARY KEY AUTOINCREMENT,
+                                id_fase INTEGER NOT NULL,
+                                dicas TEXT NOT NULL,
+                                tipo TEXT NOT NULL CHECK(tipo IN ('iniciante', 'intermediario', 'gerencia')),
+                                resposta_certa TEXT NOT NULL,
+                                resposta_errada TEXT,
+                                FOREIGN KEY (id_fase) REFERENCES fase(id_fase)
+                            );
+                        """)
+
 
             con.commit()
         except sqlite3.Error as erro:
