@@ -46,6 +46,12 @@ class BancoDeDados:
                                 FOREIGN KEY (id_fase) REFERENCES fase(id_fase)
                             );
                         """)
+            cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS tipo_fase (
+                                id_tipo INTEGER PRIMARY KEY AUTOINCREMENT,
+                                nome TEXT NOT NULL UNIQUE
+                            );
+                        """)
 
 
             con.commit()
