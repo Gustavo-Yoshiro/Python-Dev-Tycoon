@@ -47,11 +47,15 @@ class BancoDeDados:
                             );
                         """)
             cursor.execute("""
-                            CREATE TABLE IF NOT EXISTS tipo_fase (
-                                id_tipo INTEGER PRIMARY KEY AUTOINCREMENT,
-                                nome TEXT NOT NULL UNIQUE
+                            CREATE TABLE IF NOT EXISTS save (
+                                id_save INTEGER PRIMARY KEY AUTOINCREMENT,
+                                id_jogador INTEGER NOT NULL,
+                                data_save TEXT NOT NULL,
+                                tempo_jogo INTEGER DEFAULT 0,
+                                FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador)
                             );
                         """)
+
 
 
             con.commit()
