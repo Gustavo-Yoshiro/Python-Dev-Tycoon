@@ -1,5 +1,5 @@
-from Persistência.Impl.Banco import BancoDeDados
-from Persistência.Impl.fasePersistencia  import FasePersistencia
+from Persistencia.Impl.Banco import BancoDeDados
+from Persistencia.Impl.fasePersistencia  import FasePersistencia
 
 # 1. Instanciar banco e persistência de fase
 banco = BancoDeDados()
