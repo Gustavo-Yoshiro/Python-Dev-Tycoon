@@ -30,7 +30,7 @@ class BancoDeDados:
             cursor.execute("""
                                 CREATE TABLE IF NOT EXISTS fase (
                                     id_fase INTEGER PRIMARY KEY AUTOINCREMENT,
-                                tipo_fase TEXT NOT NULL,
+                                    tipo_fase TEXT NOT NULL,
                                     topico TEXT NOT NULL,
                                     introdução TEXT NOT NULL
                                 );
