@@ -92,22 +92,3 @@ class BancoDeDados:
             raise
         finally:
             con.close()
-
-    def atualizar(self, tabela, id_registro, campos):
-        """Atualiza um registro no banco de dados"""
-        try:
-            con = self.conectar()
-            cursor = con.cursor()
-            
-            sets = ", ".join([f"{k} = ?" for k in campos.keys()])
-            valores = list(campos.values()) + [id_registro]
-            
-            sql = f"UPDATE {tabela} SET {sets} WHERE id = ?"
-            cursor.execute(sql, valores)
-            con.commit()
-            return True
-        except sqlite3.Error as erro:
-            print(f"Erro ao atualizar {tabela}:", erro)
-            raise
-        finally:
-            con.close()
