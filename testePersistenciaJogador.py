@@ -1,5 +1,5 @@
-from Persistência.Impl.Banco import BancoDeDados
-from Persistência.Impl.jogadorPersistencia  import JogadorPersistencia
+from Persistencia.Impl.Banco import BancoDeDados
+from Persistencia.Impl.jogadorPersistencia  import JogadorPersistencia
 
 # 1. Instancia o banco (não cria tabelas de novo, só conecta)
 banco = BancoDeDados()
