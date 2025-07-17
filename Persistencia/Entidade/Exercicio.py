@@ -1,12 +1,12 @@
 class Exercicio:
-    def __init__(self, id_exercicio, id_fase, dicas, tipo, resposta_certa, resposta_erradas):
+    def __init__(self, id_exercicio, id_fase, dicas, pergunta, tipo, resposta_certa, resposta_erradas):
         self.__id_exercicio = id_exercicio
         self.__id_fase = id_fase
         self.__dicas = dicas
+        self.__pergunta = pergunta
         self.__tipo = tipo 
         self.__resposta_certa = resposta_certa
         self.__resposta_erradas = resposta_erradas
-
 
     def get_id_exercicio(self):
         return self.__id_exercicio
@@ -16,6 +16,9 @@ class Exercicio:
 
     def get_dicas(self):
         return self.__dicas
+
+    def get_pergunta(self):
+        return self.__pergunta
 
     def get_tipo(self):
         return self.__tipo
@@ -35,6 +38,9 @@ class Exercicio:
     def set_dicas(self, dicas):
         self.__dicas = dicas
 
+    def set_pergunta(self, pergunta):
+        self.__pergunta = pergunta
+
     def set_tipo(self, tipo):
         self.__tipo = tipo
 
@@ -43,7 +49,3 @@ class Exercicio:
 
     def set_resposta_erradas(self, resposta_erradas):
         self.__resposta_erradas = resposta_erradas
-
-
-
-

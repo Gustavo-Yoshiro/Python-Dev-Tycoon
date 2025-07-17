@@ -8,12 +8,13 @@ class ExercicioPersistenciaImpl(ExercicioPersistencia):
 
     def salvar(self, exercicio: Exercicio):
         sql = """
-            INSERT INTO exercicio (id_fase, dicas, tipo, resposta_certa, resposta_errada)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO exercicio (id_fase, dicas, pergunta, tipo, resposta_certa, resposta_errada)
+            VALUES (?, ?, ?, ?, ?, ?)
         """
         parametros = (
             exercicio.get_id_fase(),
             exercicio.get_dicas(),
+            exercicio.get_pergunta(),  # ✅ aqui é essencial
             exercicio.get_tipo(),
             exercicio.get_resposta_certa(),
             exercicio.get_resposta_erradas()

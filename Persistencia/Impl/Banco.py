@@ -40,7 +40,8 @@ class BancoDeDados:
                                 id_exercicio INTEGER PRIMARY KEY AUTOINCREMENT,
                                 id_fase INTEGER NOT NULL,
                                 dicas TEXT NOT NULL,
-                                tipo TEXT NOT NULL CHECK(tipo IN ('iniciante', 'intermediario', 'gerencia')),
+                                pergunta TEXT NOT NULL,
+                                tipo TEXT NOT NULL CHECK(tipo IN ('objetiva', 'dissertativa')),
                                 resposta_certa TEXT NOT NULL,
                                 resposta_errada TEXT,
                                 FOREIGN KEY (id_fase) REFERENCES fase(id_fase)
