@@ -27,7 +27,16 @@ class Exercicio:
         return self.__resposta_certa
 
     def get_resposta_erradas(self):
-        return self.__resposta_erradas
+        if isinstance(self.__resposta_erradas, list):
+            return self.__resposta_erradas
+        elif isinstance(self.__resposta_erradas, str):
+            # Remove aspas e espaços e quebra em lista por virgula
+            #return [x.strip().strip('"').strip("'") for x in self.__resposta_erradas.strip("[]()").split(",")]
+            #por pipe
+            return [x.strip() for x in self.__resposta_erradas.strip("[]()").split("|")]
+
+        return []
+
 
     def set_id_exercicio(self, id_exercicio):
         self.__id_exercicio = id_exercicio

@@ -11,15 +11,24 @@ class ExercicioPersistenciaImpl(ExercicioPersistencia):
             INSERT INTO exercicio (id_fase, dicas, pergunta, tipo, resposta_certa, resposta_errada)
             VALUES (?, ?, ?, ?, ?, ?)
         """
+        # TRATAMENTO AQUI: garante string
+        resposta_erradas = exercicio.get_resposta_erradas()
+        if isinstance(resposta_erradas, list):
+            resposta_erradas = "|".join(resposta_erradas)
+        elif resposta_erradas is None:
+            resposta_erradas = ""
+
+        # Parâmetros montados já padronizados:
         parametros = (
             exercicio.get_id_fase(),
             exercicio.get_dicas(),
-            exercicio.get_pergunta(),  # ✅ aqui é essencial
+            exercicio.get_pergunta(),
             exercicio.get_tipo(),
             exercicio.get_resposta_certa(),
-            exercicio.get_resposta_erradas()
+            resposta_erradas
         )
         return self.__bd.executar(sql, parametros)
+
 
     def buscar_por_id(self, id_exercicio: int) -> Exercicio:
         sql = "SELECT * FROM exercicio WHERE id_exercicio = ?"

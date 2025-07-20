@@ -41,7 +41,7 @@ class BancoDeDados:
                                 id_fase INTEGER NOT NULL,
                                 dicas TEXT NOT NULL,
                                 pergunta TEXT NOT NULL,
-                                tipo TEXT NOT NULL CHECK(tipo IN ('objetiva', 'dissertativa')),
+                                tipo TEXT NOT NULL CHECK(tipo IN ('objetiva', 'dissertativa','dragdrop')),
                                 resposta_certa TEXT NOT NULL,
                                 resposta_errada TEXT,
                                 FOREIGN KEY (id_fase) REFERENCES fase(id_fase)
