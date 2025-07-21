@@ -1,52 +1,48 @@
 import pygame
 
 class TelaIntroducaoTopico:
-    def __init__(self, fase, largura=640, altura=600):
-        self.fase = fase  # objeto Fase (com get_titulo, get_introducao etc)
+    def __init__(self, largura, altura, nome_topico, descricao, on_confirmar):
         self.largura = largura
         self.altura = altura
-        self.fonte = pygame.font.SysFont('Arial', 28)
+        self.nome_topico = nome_topico
+        self.descricao = descricao
+        self.on_confirmar = on_confirmar
+
+        pygame.font.init()
+        self.fonte_titulo = pygame.font.SysFont('Arial', 34, bold=True)
+        self.fonte = pygame.font.SysFont('Arial', 24)
         self.fonte_pequena = pygame.font.SysFont('Arial', 20)
-        self.entendido = False
-        self.rect_botao = pygame.Rect(largura//2 - 80, altura - 90, 160, 50)
+        self.rect_confirmar = pygame.Rect(largura // 2 - 70, altura - 110, 140, 50)
 
     def desenhar(self, tela):
-        tela.fill((35, 38, 55))
-        y = 40
-        # Título do tópico
-        titulo = self.fase.get_titulo() if hasattr(self.fase, 'get_titulo') else f"Tópico: {self.fase.get_topico()}"
-        tela.blit(self.fonte.render(str(titulo), True, (0, 200, 255)), (50, y))
-        y += 50
-
-        # Introdução (quebra em várias linhas se necessário)
-        intro = self.fase.get_introducao() if hasattr(self.fase, 'get_introducao') else str(self.fase)
-        linhas = self._quebrar_linhas(intro, self.fonte_pequena, self.largura - 100)
+        tela.fill((35, 35, 55))
+        tela.blit(self.fonte_titulo.render(f"Tópico: {self.nome_topico}", True, (0, 210, 255)), (60, 40))
+        # Quebrar a descrição em linhas de até 60 caracteres
+        descricao = self.descricao
+        linhas = []
+        while len(descricao) > 0:
+            if len(descricao) > 60:
+                idx = descricao.rfind(' ', 0, 60)
+                if idx == -1: idx = 60
+                linhas.append(descricao[:idx])
+                descricao = descricao[idx:].lstrip()
+            else:
+                linhas.append(descricao)
+                break
+        y = 110
         for linha in linhas:
-            tela.blit(self.fonte_pequena.render(linha, True, (230, 230, 230)), (50, y))
-            y += 30
+            tela.blit(self.fonte_pequena.render(linha, True, (255,255,255)), (60, y))
+            y += 32
 
-        # Botão "Entendi"
-        pygame.draw.rect(tela, (0, 200, 120), self.rect_botao, border_radius=18)
-        tela.blit(self.fonte_pequena.render("Entendi!", True, (255,255,255)), (self.rect_botao.x+35, self.rect_botao.y+13))
+        tela.blit(self.fonte_pequena.render("Leia com atenção a introdução acima.", True, (255,255,100)), (60, y+8))
+        # Botão
+        pygame.draw.rect(tela, (0, 170, 80), self.rect_confirmar)
+        tela.blit(self.fonte_pequena.render("ENTENDI!", True, (255,255,255)), (self.rect_confirmar.x+22, self.rect_confirmar.y+14))
 
     def tratar_eventos(self, eventos):
         for evento in eventos:
             if evento.type == pygame.MOUSEBUTTONDOWN:
-                if self.rect_botao.collidepoint(evento.pos):
-                    self.entendido = True
-
-    def _quebrar_linhas(self, texto, fonte, largura_max):
-        # Simples quebra de linhas para textos longos
-        palavras = texto.split()
-        linhas = []
-        linha = ""
-        for palavra in palavras:
-            test = f"{linha} {palavra}".strip()
-            if fonte.size(test)[0] < largura_max:
-                linha = test
-            else:
-                linhas.append(linha)
-                linha = palavra
-        if linha:
-            linhas.append(linha)
-        return linhas
+                x, y = evento.pos
+                if self.rect_confirmar.collidepoint(x, y):
+                    if self.on_confirmar:
+                        self.on_confirmar()
