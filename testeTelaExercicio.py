@@ -1,7 +1,7 @@
 import pygame
-from Ui.TelaExercicio import TelaExercicio
-from Ui.TelaResultado import TelaResultado
-from Ui.TelaIntroducaoTopico import TelaIntroducaoTopico
+from UI.TelaExercicio import TelaExercicio
+from UI.TelaResultado import TelaResultado
+from UI.TelaIntroducaoTopico import TelaIntroducaoTopico
 from Service.Impl.FaseServiceImpl import FaseServiceImpl
 
 pygame.init()
