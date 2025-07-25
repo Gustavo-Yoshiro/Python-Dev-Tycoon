@@ -5,9 +5,12 @@ from Ui.TelaIntroducaoTopico import TelaIntroducaoTopico
 from Service.Impl.FaseServiceImpl import FaseServiceImpl
 
 pygame.init()
-LARGURA = 800
-ALTURA = 700
-tela = pygame.display.set_mode((LARGURA, ALTURA))
+#LARGURA = 800
+#ALTURA = 700
+#tela = pygame.display.set_mode((LARGURA, ALTURA))
+tela = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+LARGURA, ALTURA = tela.get_size()
+
 clock = pygame.time.Clock()
 id_fases = [1, 2, 3,4,5,6,7,8]
 fase_atual = 0
@@ -70,7 +73,9 @@ while rodando:
     for evento in eventos:
         if evento.type == pygame.QUIT:
             rodando = False
-
+        elif evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_ESCAPE:
+                rodando = False
     if not rodando:
         break  # Sai do loop logo depois do evento QUIT!
 

@@ -1,13 +1,14 @@
 import pygame
 from Service.Impl.ExercicioServiceImpl import ExercicioServiceImpl
 import random
+import os
 
 class TelaExercicio:
-    def __init__(self, largura, altura, total_fases=1, fases_concluidas=0,callback_rever_introducao=None):
+    def __init__(self, largura, altura, total_fases=1, fases_concluidas=0, callback_rever_introducao=None):
         self.largura = largura
         self.altura = altura
         pygame.font.init()
-        self.fonte = pygame.font.SysFont('Consolas', 24)  # monoespaçada para código
+        self.fonte = pygame.font.SysFont('Consolas', 24)
         self.fonte_pequena = pygame.font.SysFont('Consolas', 18)
         self.exercicio_service = ExercicioServiceImpl()
         self.exercicios = []
@@ -15,17 +16,49 @@ class TelaExercicio:
         self.input_ativo = False
         self.resposta_usuario = ""
         self.resultado = ""
-        self.caixa_input = pygame.Rect(50, 400, 400, 80)
-        self.rect_alternativas = []
-        self.alternativa_selecionada = None
-        self.rect_enviar = pygame.Rect(480, 400, 120, 40)
         self.feedback_ativo = False
         self.indice_atual = 0
         self.acertos = 0
         self.erros = 0
         self.finalizado = False
-        self.rect_livro = pygame.Rect(self.largura - 60, 25, 40, 40)  # ajusta a posição conforme o layout
         self.callback_rever_introducao = callback_rever_introducao
+
+        # Livro de ajuda
+        # Livro/ajuda no canto superior direito (fora do monitor)
+        self.rect_livro = pygame.Rect(int(largura * 0.85), int(altura * 0.12), 48, 48)
+        self.img_ajuda = pygame.image.load(os.path.join("Assets", "ajuda.png")).convert_alpha()
+        self.img_ajuda = pygame.transform.smoothscale(self.img_ajuda, (self.rect_livro.width, self.rect_livro.height))
+
+        # Imagem de fundo do monitor
+        caminho_img = os.path.join("Assets", "intro_pc1.png")
+        self.bg = pygame.image.load(caminho_img).convert_alpha()
+        self.bg = pygame.transform.smoothscale(self.bg, (largura, altura))
+
+        # Painel central do monitor (para enunciado e blocos)
+        self.painel_x = int(largura * 0.286)
+        self.painel_y = int(altura * 0.228)
+        self.painel_w = int(largura * 0.425)
+        self.painel_h = int(altura * 0.375)
+
+        # Barra azul do topo (progresso dos tópicos e questões)
+        self.barra_topo_x = self.painel_x
+        self.barra_topo_y = self.painel_y - 82
+        self.barra_topo_w = self.painel_w
+        self.barra_topo_h = 16
+
+        
+        self.botao_w = 250        # Largura maior
+        self.botao_h = 30         # Altura maior
+        self.botao_x = self.painel_x + (self.painel_w - self.botao_w) // 2  # Centralizado
+        self.botao_y = self.painel_y + self.painel_h + 42                   # Um pouco abaixo do painel
+        self.rect_enviar = pygame.Rect(self.botao_x, self.botao_y, self.botao_w, self.botao_h)
+
+        
+
+        # Caixa de input para resposta dissertativa
+        self.caixa_input = pygame.Rect(self.painel_x + 30, self.botao_y - 170, self.painel_w - 60, 90)
+        self.rect_alternativas = []
+        self.alternativa_selecionada = None
 
         # Progresso geral (tópicos)
         self.total_fases = total_fases
@@ -34,7 +67,7 @@ class TelaExercicio:
         # Para drag and drop
         self.blocos_disponiveis = []
         self.blocos_resposta = []
-    #testando quebra de linha automatica
+
     @staticmethod
     def quebrar_texto(texto, fonte, largura_max):
         palavras = texto.split(' ')
@@ -49,7 +82,7 @@ class TelaExercicio:
                 linha = teste
         linhas.append(linha)
         return linhas
-    
+
     def carregar_exercicios(self, id_fase):
         self.exercicios = self.exercicio_service.listar_exercicios_por_fase(id_fase)
         self.indice_atual = 0
@@ -65,47 +98,45 @@ class TelaExercicio:
         self.blocos_resposta = []
 
     def desenhar(self, tela):
-        tela.fill((30, 30, 30))
+        tela.blit(self.bg, (0, 0))
 
-        # Barra de progresso geral (tópicos) - descendo para Y = 30
+        # --- BARRA DE PROGRESSO GERAL (tópicos) ---
         if self.total_fases > 1:
-            largura_total = 500
             progresso = self.fases_concluidas / self.total_fases
-            pygame.draw.rect(tela, (120, 120, 120), (50, 15, largura_total, 8))
-            pygame.draw.rect(tela, (0, 200, 255), (50, 15, int(largura_total * progresso), 8))
-            tela.blit(self.fonte_pequena.render(f"Tópicos: {self.fases_concluidas}/{self.total_fases}", True, (255,255,255)), (560, 13))
+            pygame.draw.rect(tela, (70, 120, 180), (self.barra_topo_x, self.barra_topo_y, self.barra_topo_w, 8), border_radius=3)
+            pygame.draw.rect(tela, (0, 200, 255), (self.barra_topo_x, self.barra_topo_y, int(self.barra_topo_w * progresso), 8), border_radius=3)
+            tela.blit(self.fonte_pequena.render(f"Tópicos: {self.fases_concluidas}/{self.total_fases}", True, (255,255,255)),
+                      (self.barra_topo_x + self.barra_topo_w + 10, self.barra_topo_y - 2))
 
-        # Barra de progresso das questões - descendo para Y = 60
+        # --- BARRA DE PROGRESSO DAS QUESTÕES ---
         if self.exercicios:
             total = len(self.exercicios)
             progresso = (self.indice_atual + 1) / total
-            pygame.draw.rect(tela, (80, 80, 80), (50, 30, 500, 18))
-            pygame.draw.rect(tela, (0, 200, 80), (50, 30, int(500*progresso), 18))
-            tela.blit(self.fonte_pequena.render(f"Questão {self.indice_atual+1}/{total}", True, (255,255,255)), (560, 32))
+            y_barra2 = self.barra_topo_y + 14
+            pygame.draw.rect(tela, (80, 80, 80), (self.barra_topo_x, y_barra2, self.barra_topo_w, 12), border_radius=3)
+            pygame.draw.rect(tela, (0, 200, 80), (self.barra_topo_x, y_barra2, int(self.barra_topo_w*progresso), 12), border_radius=3)
+            tela.blit(self.fonte_pequena.render(f"Questão {self.indice_atual+1}/{total}", True, (255,255,255)),
+                      (self.barra_topo_x + self.barra_topo_w + 10, y_barra2))
 
-        # Tela finalizada
+        # --- ÁREA CENTRAL DO EXERCÍCIO (painel escuro do monitor) ---
         if self.finalizado:
-            """
             msg = f"Quiz finalizado!"
             placar = f"Acertos: {self.acertos} | Erros: {self.erros} de {len(self.exercicios)}"
-            tela.blit(self.fonte.render(msg, True, (0, 255, 255)), (50, 150))
-            tela.blit(self.fonte_pequena.render(placar, True, (255, 255, 255)), (50, 200))
-            """
+            tela.blit(self.fonte.render(msg, True, (0, 255, 255)), (self.painel_x + 30, self.painel_y + 70))
+            tela.blit(self.fonte_pequena.render(placar, True, (255, 255, 255)), (self.painel_x + 30, self.painel_y + 120))
             return
 
-        
-
         if self.exercicio_selecionado:
-            y = 60
-            tela.blit(self.fonte.render("Enunciado:", True, (255, 255, 0)), (50, y))
-            y += 30
-            linhas_pergunta = self.quebrar_texto(self.exercicio_selecionado.get_pergunta(), self.fonte_pequena, 540)
+            y = self.painel_y + 48
+            tela.blit(self.fonte.render("Enunciado:", True, (255, 255, 0)), (self.painel_x + 22, y))
+            y += 34
+            linhas_pergunta = self.quebrar_texto(self.exercicio_selecionado.get_pergunta(), self.fonte_pequena, self.painel_w - 60)
             for linha in linhas_pergunta:
-                tela.blit(self.fonte_pequena.render(linha, True, (255, 255, 255)), (50, y))
-                y += 25  # ajuste o espaçamento se quiser
+                tela.blit(self.fonte_pequena.render(linha, True, (255, 255, 255)), (self.painel_x + 22, y))
+                y += 25
 
-            tela.blit(self.fonte_pequena.render(f"Dica: {self.exercicio_selecionado.get_dicas()}", True, (180, 180, 0)), (50, y))
-            y += 30
+            tela.blit(self.fonte_pequena.render(f"Dica: {self.exercicio_selecionado.get_dicas()}", True, (180, 180, 0)), (self.painel_x + 22, y))
+            y += 32
 
             tipo = self.exercicio_selecionado.get_tipo().lower()
 
@@ -118,7 +149,7 @@ class TelaExercicio:
                 letras = ['A', 'B', 'C', 'D'][:len(alternativas)]
                 self.rect_alternativas = []
                 for idx, alt in enumerate(alternativas):
-                    rect = pygame.Rect(60, y, 450, 30)
+                    rect = pygame.Rect(self.painel_x + 22, y, self.painel_w - 44, 30)
                     self.rect_alternativas.append((rect, alt, idx))
                     cor = (200, 200, 50)
                     pygame.draw.rect(tela, cor, rect, 0)
@@ -147,7 +178,6 @@ class TelaExercicio:
 
             # --------------- DRAG & DROP (painel duplo) -------------------
             elif tipo == "dragdrop":
-                # Inicializa blocos só na primeira vez desse exercício
                 if not self.blocos_disponiveis and not self.blocos_resposta:
                     resposta_certa = self.exercicio_selecionado.get_resposta_certa()
                     erradas = self.exercicio_selecionado.get_resposta_erradas()
@@ -159,54 +189,51 @@ class TelaExercicio:
                     self.blocos_disponiveis = [(bloco, None) for bloco in blocos]
                     self.blocos_resposta = []
 
-                # PAINEL ESQUERDA: blocos disponíveis
-                tela.blit(self.fonte_pequena.render("Blocos disponíveis:", True, (200,200,255)), (60, y))
+                tela.blit(self.fonte_pequena.render("Blocos disponíveis:", True, (200,200,255)), (self.painel_x + 22, y))
                 bloco_altura = 35
                 for i, (bloco, _) in enumerate(self.blocos_disponiveis):
-                    rect = pygame.Rect(60, y+30+i*bloco_altura, 300, bloco_altura-5)
+                    rect = pygame.Rect(self.painel_x + 22, y+30+i*bloco_altura, int(self.painel_w*0.48), bloco_altura-5)
                     pygame.draw.rect(tela, (40, 120, 255), rect)
                     pygame.draw.rect(tela, (30, 40, 90), rect, 2)
                     tela.blit(self.fonte_pequena.render(bloco, True, (255,255,255)), (rect.x+5, rect.y+7))
                     self.blocos_disponiveis[i] = (bloco, rect)
 
-                # PAINEL DIREITA: montagem da resposta
-                tela.blit(self.fonte_pequena.render("Sua resposta:", True, (120,255,120)), (400, y))
+                tela.blit(self.fonte_pequena.render("Sua resposta:", True, (120,255,120)), (self.painel_x + int(self.painel_w*0.55), y))
                 for i, (bloco, _) in enumerate(self.blocos_resposta):
-                    rect = pygame.Rect(400, y+30+i*bloco_altura, 300, bloco_altura-5)
+                    rect = pygame.Rect(self.painel_x + int(self.painel_w*0.55), y+30+i*bloco_altura, int(self.painel_w*0.43), bloco_altura-5)
                     pygame.draw.rect(tela, (80, 210, 80), rect)
                     pygame.draw.rect(tela, (30, 60, 30), rect, 2)
                     tela.blit(self.fonte_pequena.render(bloco, True, (255,255,255)), (rect.x+5, rect.y+7))
                     self.blocos_resposta[i] = (bloco, rect)
 
-            # ----------------- Botão ENVIAR / CONTINUAR -------------------
+            # --- Botão ENVIAR / CONTINUAR ---
             if not self.feedback_ativo:
                 cor_btn = (0, 180, 80) if self.pode_enviar() else (80, 80, 80)
                 label_btn = "ENVIAR"
             else:
                 cor_btn = (0, 150, 200)
                 label_btn = "CONTINUAR"
-            pygame.draw.rect(tela, cor_btn, self.rect_enviar)
-            tela.blit(self.fonte_pequena.render(label_btn, True, (255, 255, 255)), (self.rect_enviar.x + 10, self.rect_enviar.y + 10))
+            pygame.draw.rect(tela, cor_btn, self.rect_enviar, border_radius=13)
+            tela.blit(self.fonte_pequena.render(label_btn, True, (255, 255, 255)),
+                      (self.rect_enviar.x + (self.rect_enviar.w-100)//2 + 12, self.rect_enviar.y + 9))
 
-            tipo = self.exercicio_selecionado.get_tipo().lower()
-            # Feedback
+            # --- Feedback ---
             if self.resultado:
                 cor = (0, 255, 0) if "Correta" in self.resultado else (255, 0, 0)
                 tipo = self.exercicio_selecionado.get_tipo().lower()
                 if tipo == "dissertativa":
-                    # Abaixa mais o feedback para não ficar em cima do input
-                    tela.blit(self.fonte.render(self.resultado, True, cor), (50, self.caixa_input.y + self.caixa_input.height + 15))
+                    tela.blit(self.fonte.render(self.resultado, True, cor),
+                              (self.caixa_input.x, self.caixa_input.y + self.caixa_input.height + 15))
                 elif tipo == "objetiva":
-                    # Usa o y+220 como antes ou ajuste como preferir
-                    tela.blit(self.fonte.render(self.resultado, True, cor), (50, y + 220))
+                    tela.blit(self.fonte.render(self.resultado, True, cor),
+                              (self.painel_x + 22, y + 36))
                 elif tipo == "dragdrop":
-                    # Pode colocar bem embaixo dos blocos montados
-                    tela.blit(self.fonte.render(self.resultado, True, cor), (400, y + 180))
+                    tela.blit(self.fonte.render(self.resultado, True, cor),
+                              (self.painel_x + int(self.painel_w*0.55), y + 180))
 
-        # No método desenhar (no final dele)
-        pygame.draw.rect(tela, (220, 220, 180), self.rect_livro)
-        # Pode desenhar um livro, ou apenas um texto:
-        tela.blit(self.fonte_pequena.render("📖", True, (60, 60, 60)), (self.rect_livro.x + 8, self.rect_livro.y + 6))
+        # --- Livro/ajuda ---
+        tela.blit(self.img_ajuda, (self.rect_livro.x, self.rect_livro.y))
+
 
     def pode_enviar(self):
         if not self.exercicio_selecionado:
@@ -223,33 +250,30 @@ class TelaExercicio:
 
     def tratar_eventos(self, eventos):
         for evento in eventos:
-            # ---------------- DRAG & DROP -------------------
+            # DRAG & DROP
             if self.exercicio_selecionado and self.exercicio_selecionado.get_tipo().lower() == "dragdrop":
                 if evento.type == pygame.MOUSEBUTTONDOWN:
                     x, y = evento.pos
-                    # CLICOU EM BLOCO DISPONÍVEL? (esquerda)
                     for i, (bloco, rect) in enumerate(self.blocos_disponiveis):
                         if rect and rect.collidepoint(x, y) and not self.feedback_ativo:
                             self.blocos_resposta.append((bloco, None))
                             self.blocos_disponiveis.pop(i)
                             break
-                    # CLICOU EM BLOCO DE RESPOSTA? (direita)
                     for i, (bloco, rect) in enumerate(self.blocos_resposta):
                         if rect and rect.collidepoint(x, y) and not self.feedback_ativo:
                             self.blocos_disponiveis.append((bloco, None))
                             self.blocos_resposta.pop(i)
                             break
 
-            # ------------- RESTANTE DOS EVENTOS NORMAIS -------------
+            # RESTANTE DOS EVENTOS NORMAIS
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 x, y = evento.pos
 
                 if self.rect_livro.collidepoint(x, y):
-                    # Chame uma função de callback (ex: self.callback_rever_introducao())
                     if self.callback_rever_introducao:
-                        self.callback_rever_introducao(self)  # passe a própria tela/exercicio
+                        self.callback_rever_introducao(self)
                     return
-                
+
                 # Selecionar alternativa
                 if self.exercicio_selecionado and self.exercicio_selecionado.get_tipo().lower() == "objetiva":
                     if hasattr(self, "rect_alternativas"):
@@ -260,7 +284,7 @@ class TelaExercicio:
                 if self.exercicio_selecionado and self.exercicio_selecionado.get_tipo().lower() == "dissertativa":
                     if self.caixa_input.collidepoint(x, y) and not self.feedback_ativo:
                         self.input_ativo = True
-                
+
                 # Clique no botão ENVIAR / CONTINUAR
                 if self.exercicio_selecionado and self.rect_enviar.collidepoint(x, y):
                     if not self.feedback_ativo and self.pode_enviar():
@@ -270,7 +294,7 @@ class TelaExercicio:
                             self.acertos += 1
                         else:
                             self.erros += 1
-                    elif self.feedback_ativo:  # CONTINUAR
+                    elif self.feedback_ativo:
                         self.indice_atual += 1
                         if self.indice_atual < len(self.exercicios):
                             self.exercicio_selecionado = self.exercicios[self.indice_atual]
