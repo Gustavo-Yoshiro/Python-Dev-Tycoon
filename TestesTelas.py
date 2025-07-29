@@ -1,24 +1,30 @@
 import pygame
 from UI.TelaInicio import TelaInicio
-from UI.TelaExercicio import TelaExercicio
+from UI.TelaSave import TelaSave
 
 pygame.init()
-largura, altura = 800, 600
-tela = pygame.display.set_mode((largura, altura))
+
+LARGURA, ALTURA = 1280, 720
+tela = pygame.display.set_mode((LARGURA, ALTURA))
+pygame.display.set_caption("Teste - TelaSave")
+
 relogio = pygame.time.Clock()
 
-# Inicialmente mostra a tela de início
+# Estados
 tela_atual = None
 
 def iniciar_jogo():
     global tela_atual
-    tela_exercicio = TelaExercicio(largura, altura)
-    tela_exercicio.carregar_exercicios(id_fase=1)
-    tela_atual = tela_exercicio
+    tela_atual = TelaSave(LARGURA, ALTURA, callback_selecionar_slot=slot_selecionado)
 
-tela_inicio = TelaInicio(largura, altura, iniciar_jogo)
-tela_atual = tela_inicio
+def slot_selecionado(slot_id):
+    print(f"Slot {slot_id} selecionado!")
+    # Aqui você pode mudar para outra tela ou carregar o jogo
 
+# Começa com a tela de início
+tela_atual = TelaInicio(LARGURA, ALTURA, callback_iniciar=iniciar_jogo)
+
+# Loop principal
 rodando = True
 while rodando:
     eventos = pygame.event.get()
@@ -28,6 +34,7 @@ while rodando:
 
     tela_atual.tratar_eventos(eventos)
     tela_atual.desenhar(tela)
+
     pygame.display.flip()
     relogio.tick(60)
 
