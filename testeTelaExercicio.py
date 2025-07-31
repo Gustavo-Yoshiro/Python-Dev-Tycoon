@@ -22,20 +22,22 @@ tela_atual = "introducao"
 tela_exercicio = None
 tela_resultado = None
 tela_introducao = None
-
+nome_topico_atual = ""
 # Para "voltar" do livro
 tela_exercicio_salva = None
 
 def mostrar_introducao(tela_salva=None):
-    global tela_introducao, tela_atual, tela_exercicio_salva
+    global tela_introducao, tela_atual, tela_exercicio_salva, nome_topico_atual
     id_fase = id_fases[fase_atual]
     fase = fase_service.buscar_fase_por_id(id_fase)
     nome = fase.get_topico()
     descricao = fase.get_introducao()
+    nome_topico_atual = nome         # <-- ADICIONE ESTA LINHA!
     tela_introducao = TelaIntroducaoTopico(LARGURA, ALTURA, nome, descricao, on_confirmar=iniciar_exercicio)
     tela_atual = "introducao"
     if tela_salva:
         tela_exercicio_salva = tela_salva
+
 
 def iniciar_exercicio():
     global tela_exercicio, tela_atual, tela_exercicio_salva
@@ -45,6 +47,7 @@ def iniciar_exercicio():
     else:
         tela_exercicio = TelaExercicio(
             LARGURA, ALTURA,
+            nome_topico_atual,
             total_fases=len(id_fases), fases_concluidas=fase_atual,
             callback_rever_introducao=mostrar_introducao  # Passa callback do livro
         )
