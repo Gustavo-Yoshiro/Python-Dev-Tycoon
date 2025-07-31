@@ -8,10 +8,10 @@ class TelaSave:
         self.save_service = save_service
         self.callback_selecionar_slot = callback_selecionar_slot
 
-        self.fundo = pygame.image.load("assets/TelaSave/fundo_save.png")
+        self.fundo = pygame.image.load("Assets/TelaSave.png")
         self.fundo = pygame.transform.scale(self.fundo, (largura, altura))
         
-        self.slot_imagem = pygame.image.load("assets/TelaSave/slot_vazio.png")
+        self.slot_imagem = pygame.image.load("Assets/SlotSave.png")
         self.slot_imagem = pygame.transform.scale(self.slot_imagem, (300, 350))
         
         self.font = pygame.font.SysFont("arial", 24)
