@@ -1,4 +1,5 @@
 import pygame
+from datetime import datetime
 
 class TelaSave:
     def __init__(self, largura, altura, id_jogador, save_service, callback_selecionar_slot):
@@ -8,13 +9,18 @@ class TelaSave:
         self.save_service = save_service
         self.callback_selecionar_slot = callback_selecionar_slot
 
+        # Carrega assets
         self.fundo = pygame.image.load("Assets/TelaSave.png")
         self.fundo = pygame.transform.scale(self.fundo, (largura, altura))
         
         self.slot_imagem = pygame.image.load("Assets/SlotSave.png")
         self.slot_imagem = pygame.transform.scale(self.slot_imagem, (300, 350))
         
-        self.font = pygame.font.SysFont("arial", 24)
+        # Fontes
+        self.font_titulo = pygame.font.SysFont("arial", 24, bold=True)
+        self.font_normal = pygame.font.SysFont("arial", 20)
+        self.font_pequena = pygame.font.SysFont("arial", 16)
+        
         self.slots = self.carregar_slots()
 
     def carregar_slots(self):
@@ -22,41 +28,75 @@ class TelaSave:
         saves = self.save_service.listar_saves_do_jogador(self.id_jogador)
 
         for i in range(3):
+            slot_rect = pygame.Rect(150 + i * 350, 200, 300, 350)
+            
             if i < len(saves):
                 save = saves[i]
                 slots.append({
-                    "rect": pygame.Rect(150 + i * 350, 200, 300, 350),
-                    "save": save
+                    "rect": slot_rect,
+                    "save": save,
+                    "data": save.get_data_save()
                 })
             else:
                 slots.append({
-                    "rect": pygame.Rect(150 + i * 350, 200, 300, 350),
-                    "save": None
+                    "rect": slot_rect,
+                    "save": None,
+                    "data": None
                 })
         return slots
 
     def desenhar(self, tela):
         tela.blit(self.fundo, (0, 0))
+        
+        # Título
+        titulo = self.font_titulo.render("SELECIONE UM SLOT DE SAVE", True, (255, 255, 255))
+        tela.blit(titulo, (self.largura//2 - titulo.get_width()//2, 100))
 
         for slot in self.slots:
+            # Desenha o slot
             tela.blit(self.slot_imagem, (slot["rect"].x, slot["rect"].y))
 
             if slot["save"]:
                 save = slot["save"]
-                nome = self.font.render(f"Nome: {save.get_nome_jogo()}", True, (255, 255, 255))
-                nivel = self.font.render(f"Nível: {save.get_nivel()}", True, (255, 255, 255))
-                fase = self.font.render(f"Fase: {save.get_fase()}", True, (255, 255, 255))
+                
+                # ID do Save
+                save_id = self.font_pequena.render(f"ID: {save.get_id_save()}", True, (200, 200, 200))
+                tela.blit(save_id, (slot["rect"].x + 20, slot["rect"].y + 30))
+                
+                try:
+                    if slot["data"]:
+                        data_obj = datetime.strptime(slot["data"], "%Y-%m-%d %H:%M:%S")  # ajuste o formato conforme necessário
+                        data_str = data_obj.strftime("%d/%m/%Y %H:%M")
+                    else:
+                        data_str = "Sem data"
+                except Exception as e:
+                    data_str = f"Erro na data: {e}"
 
-                tela.blit(nome, (slot["rect"].x + 20, slot["rect"].y + 20))
-                tela.blit(nivel, (slot["rect"].x + 20, slot["rect"].y + 60))
-                tela.blit(fase, (slot["rect"].x + 20, slot["rect"].y + 100))
+
+                
+                # Tempo de Jogo
+                horas, resto = divmod(save.get_tempo_jogo(), 3600)
+                minutos, segundos = divmod(resto, 60)
+                tempo_str = f"Tempo: {int(horas)}h {int(minutos)}m"
+                tempo = self.font_normal.render(tempo_str, True, (255, 255, 255))
+                tela.blit(tempo, (slot["rect"].x + 20, slot["rect"].y + 110))
+                
+                # Informação genérica (pode ser substituída por dados reais quando disponíveis)
+                info = self.font_pequena.render("Save do Jogador", True, (200, 200, 200))
+                tela.blit(info, (slot["rect"].x + 20, slot["rect"].y + 150))
             else:
-                vazio = self.font.render("Slot vazio", True, (200, 200, 200))
+                vazio = self.font_normal.render("SLOT VAZIO", True, (200, 200, 200))
                 tela.blit(vazio, (slot["rect"].x + 80, slot["rect"].y + 150))
 
     def tratar_eventos(self, eventos):
         for evento in eventos:
-            if evento.type == pygame.MOUSEBUTTONDOWN:
+            if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:  # Botão esquerdo
                 for i, slot in enumerate(self.slots):
                     if slot["rect"].collidepoint(evento.pos):
-                        self.callback_selecionar_slot(i + 1)
+                        if slot["save"]:
+                            # Se há save, retorna o ID do save
+                            self.callback_selecionar_slot(slot["save"].get_id_save())
+                        else:
+                            # Se slot vazio, retorna o número do slot (1-3)
+                            self.callback_selecionar_slot(i + 1)
+                        return
