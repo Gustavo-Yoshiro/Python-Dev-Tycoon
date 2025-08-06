@@ -56,6 +56,21 @@ class BancoDeDados:
                                 FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador)
                             );
                         """)
+            cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS progresso_fase (
+                                id_progresso INTEGER PRIMARY KEY AUTOINCREMENT,
+                                id_jogador INTEGER NOT NULL,
+                                id_fase INTEGER NOT NULL,
+                                indice_exercicio INTEGER DEFAULT 0,
+                                acertos INTEGER DEFAULT 0,
+                                erros INTEGER DEFAULT 0,
+                                resposta_parcial TEXT,
+                                atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                                FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador),
+                                FOREIGN KEY (id_fase) REFERENCES fase(id_fase)
+                            );
+                        """)
+
 
 
 

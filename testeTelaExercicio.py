@@ -3,11 +3,13 @@ from UI.TelaExercicio import TelaExercicio
 from UI.TelaResultado import TelaResultado
 from UI.TelaIntroducaoTopico import TelaIntroducaoTopico
 from Service.Impl.FaseServiceImpl import FaseServiceImpl
+from Persistencia.Impl.JogadorPersistenciaImpl import JogadorPersistenciaImpl
+from Service.Impl.ProgressoFaseServiceImpl import ProgressoFaseServiceImpl
 
 pygame.init()
-#LARGURA = 800
-#ALTURA = 700
-#tela = pygame.display.set_mode((LARGURA, ALTURA))
+pygame.key.set_repeat(300, 30)
+
+
 tela = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 LARGURA, ALTURA = tela.get_size()
 
@@ -17,6 +19,16 @@ fase_atual = 0
 
 # Service para buscar dados do tópico
 fase_service = FaseServiceImpl()
+jogador_persistencia = JogadorPersistenciaImpl()
+jogador = jogador_persistencia.buscar_por_id(2) 
+
+# ====== AJUSTE AQUI ======
+progresso_service = ProgressoFaseServiceImpl()
+ultima_fase = progresso_service.progresso_persistencia.buscar_ultima_fase_do_jogador(jogador.get_id_jogador())
+if ultima_fase and ultima_fase in id_fases:
+    fase_atual = id_fases.index(ultima_fase)
+else:
+    fase_atual = 0
 
 tela_atual = "introducao"
 tela_exercicio = None
@@ -32,26 +44,41 @@ def mostrar_introducao(tela_salva=None):
     fase = fase_service.buscar_fase_por_id(id_fase)
     nome = fase.get_topico()
     descricao = fase.get_introducao()
-    nome_topico_atual = nome         # <-- ADICIONE ESTA LINHA!
-    tela_introducao = TelaIntroducaoTopico(LARGURA, ALTURA, nome, descricao, on_confirmar=iniciar_exercicio)
+    nome_topico_atual = nome
+
+    # Agora passa o jogador
+    tela_introducao = TelaIntroducaoTopico(
+        LARGURA, ALTURA, nome, descricao, on_confirmar=iniciar_exercicio, jogador=jogador
+    )
     tela_atual = "introducao"
     if tela_salva:
         tela_exercicio_salva = tela_salva
 
 
+
 def iniciar_exercicio():
+    q_x = int(LARGURA * 0.25) + int(LARGURA * 0.54) - 90
+    q_y = int(ALTURA * 0.13) + 10
+    q_centro = (q_x + 15, q_y + 15)
+    pygame.mouse.set_pos(q_centro)
     global tela_exercicio, tela_atual, tela_exercicio_salva
     if tela_exercicio_salva is not None:
         tela_exercicio = tela_exercicio_salva
         tela_exercicio_salva = None
+        #tela_exercicio.centralizar_prompt()
+        #print("APÓS CENTRALIZAR:", tela_exercicio.rect_prompt.x, tela_exercicio.rect_prompt.y)
     else:
         tela_exercicio = TelaExercicio(
             LARGURA, ALTURA,
             nome_topico_atual,
             total_fases=len(id_fases), fases_concluidas=fase_atual,
-            callback_rever_introducao=mostrar_introducao  # Passa callback do livro
+            callback_rever_introducao=mostrar_introducao,  # Passa callback do livro
+            jogador=jogador,
+            id_fase=id_fases[fase_atual]
         )
-        tela_exercicio.carregar_exercicios(id_fase=id_fases[fase_atual])
+    tela_exercicio.centralizar_prompt()
+    #pygame.event.clear([pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP])
+    #tela_exercicio.carregar_exercicios(id_fase=id_fases[fase_atual])
     tela_atual = "exercicio"
 
 def avancar():
@@ -65,8 +92,16 @@ def avancar():
 
 def reiniciar():
     global tela_exercicio_salva
+    
+    progresso_service = ProgressoFaseServiceImpl()
+    progresso_service.deletar_progresso_por_jogador_fase(
+        jogador.get_id_jogador(),
+        id_fases[fase_atual]
+    )
+
     tela_exercicio_salva = None
     iniciar_exercicio()
+
 
 mostrar_introducao()
 

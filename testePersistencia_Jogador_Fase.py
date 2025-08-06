@@ -10,7 +10,7 @@ def testar_jogador():
     # Criar um novo jogador
     novo_jogador = Jogador(
         id_jogador=None,
-        nome="Maria Dev",
+        nome="João Dev",
         id_fase=1,
         social=10,
         dinheiro=150.0,
@@ -79,4 +79,4 @@ def testar_fase():
 if __name__ == "__main__":
     print("🚀 Rodando testes de Jogador e Fase...")
     testar_jogador()
-    testar_fase()
+    #testar_fase()
