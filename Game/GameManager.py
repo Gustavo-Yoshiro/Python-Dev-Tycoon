@@ -1,11 +1,14 @@
 import pygame
+from datetime import datetime
 from UI.TelaInicio import TelaInicio
 from UI.TelaSave import TelaSave
+from UI.TelaCriarJogador import TelaCriarJogador
 from UI.TelaExercicio import TelaExercicio
 from UI.TelaResultado import TelaResultado
 from UI.TelaIntroducaoTopico import TelaIntroducaoTopico
 from Service.Impl.FaseServiceImpl import FaseServiceImpl
 from Service.Impl.SaveServiceImpl import SaveServiceImpl
+from Service.Impl.JogadorServiceImpl import JogadorServiceImpl
 
 class GameManager:
     def __init__(self):
@@ -13,81 +16,215 @@ class GameManager:
         self.tela = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         self.largura, self.altura = self.tela.get_size()
         self.clock = pygame.time.Clock()
+        pygame.display.set_caption("Python Learning Game")
 
-        self.id_jogador = 1
+        # Serviços
         self.fase_service = FaseServiceImpl()
         self.save_service = SaveServiceImpl()
+        self.jogador_service = JogadorServiceImpl()
 
-        self.id_fases = [1, 2, 3, 4, 5, 6, 7, 8]
+        # Estado do jogo
+        self.save_atual = None
+        self.jogador_atual = None
         self.fase_atual = 0
+        self.id_fases = [1, 2, 3, 4, 5, 6, 7, 8]  # IDs das fases no banco de dados
         self.nome_topico_atual = ""
+        self.tempo_inicio_jogo = 0
 
+        # Assets
         self.fundo_principal = pygame.image.load("assets/TelaJogoIniciante.png")
         self.fundo_principal = pygame.transform.scale(self.fundo_principal, (self.largura, self.altura))
 
+        # Telas
         self.tela_atual = "inicio"
-        self.tela_inicio = TelaInicio(self.largura, self.altura, callback_iniciar=self.mostrar_save)
+        self.tela_inicio = TelaInicio(
+            self.largura, 
+            self.altura, 
+            callback_iniciar=self.ir_para_tela_save
+        )
         self.tela_save = None
+        self.tela_criar_jogador = None
         self.tela_introducao = None
         self.tela_exercicio = None
         self.tela_resultado = None
         self.tela_exercicio_salva = None
 
-    def mostrar_save(self):
+    def ir_para_tela_save(self):
+        """Navega para a tela de seleção de save"""
         self.tela_save = TelaSave(
-            self.largura, self.altura,
-            id_jogador=self.id_jogador,
+            self.largura,
+            self.altura,
             save_service=self.save_service,
-            callback_selecionar_slot=self.iniciar_jogo_com_save
+            jogador_service=self.jogador_service,
+            callback_selecionar_slot=self.carregar_save,
+            callback_criar_jogador=self.ir_para_criacao_jogador
         )
         self.tela_atual = "save"
 
-    def iniciar_jogo_com_save(self, id_save_ou_slot):
-        print(f"Iniciando com save/slot: {id_save_ou_slot}")
+    def ir_para_criacao_jogador(self):
+        """Navega para a tela de criação de novo jogador"""
+        self.tela_criar_jogador = TelaCriarJogador(
+            self.largura,
+            self.altura,
+            callback_confirmar=self.jogador_criado,
+            callback_voltar=self.ir_para_tela_save
+        )
+        self.tela_atual = "criar_jogador"
+
+    def jogador_criado(self, nome_jogador):
+        """Callback quando um novo jogador é criado"""
+        # Cria o jogador e o save associado
+        id_novo_jogador = self.jogador_service.criar_jogador(nome_jogador) # retorna o id ja 
+        self.jogador_atual = id_novo_jogador
+
+        novo_save = self.save_service.adicionar_save(
+            id_jogador=id_novo_jogador,
+            data_save=datetime.now(),
+            tempo_jogo=0,
+        )
+        self.save_atual = novo_save
+        self.tempo_inicio_jogo = pygame.time.get_ticks()
+        
+        # Inicia o jogo
+        self.carregar_progresso()
         self.mostrar_introducao()
 
+    def carregar_save(self, save):
+        """Carrega um save existente"""
+        self.save_atual = save
+        self.jogador_atual = self.jogador_service.buscar_jogador_por_id(save.get_id_jogador())
+        self.tempo_inicio_jogo = pygame.time.get_ticks() - (save.get_tempo_jogo() * 1000)
+        self.carregar_progresso()
+        self.mostrar_introducao()
+
+    def carregar_progresso(self):
+        """Carrega o progresso do save atual"""
+        if self.save_atual and hasattr(self.save_atual, 'get_progresso'):
+            self.fase_atual = min(self.save_atual.get_progresso(), len(self.id_fases) - 1)
+
+    def salvar_progresso(self):
+        """Atualiza o save com o progresso atual"""
+        if self.save_atual:
+            tempo_de_jogo = (pygame.time.get_ticks() - self.tempo_inicio_jogo) // 1000
+            #self.save_atual.set_progresso(self.fase_atual)
+            self.save_atual.set_tempo_jogo(tempo_de_jogo)
+            self.save_service.atualizar_save(self.save_atual)
+
     def mostrar_introducao(self, tela_salva=None):
+        """Mostra a tela de introdução do tópico atual"""
         id_fase = self.id_fases[self.fase_atual]
         fase = self.fase_service.buscar_fase_por_id(id_fase)
-        nome = fase.get_topico()
+        nome_topico = fase.get_topico()
         descricao = fase.get_introducao()
-        self.nome_topico_atual = nome
+        self.nome_topico_atual = nome_topico
+        
         self.tela_introducao = TelaIntroducaoTopico(
-            self.largura, self.altura, nome, descricao,
-            on_confirmar=self.iniciar_exercicio
+            self.largura,
+            self.altura,
+            nome_topico,
+            descricao,
+            on_confirmar=self.iniciar_exercicio,
+            #on_voltar=self.voltar_para_save
         )
         self.tela_atual = "introducao"
         if tela_salva:
             self.tela_exercicio_salva = tela_salva
 
     def iniciar_exercicio(self):
+        """Inicia a tela de exercícios para o tópico atual"""
         if self.tela_exercicio_salva is not None:
             self.tela_exercicio = self.tela_exercicio_salva
             self.tela_exercicio_salva = None
         else:
             self.tela_exercicio = TelaExercicio(
-                self.largura, self.altura,
+                self.largura,
+                self.altura,
                 self.nome_topico_atual,
-                total_fases=len(self.id_fases), fases_concluidas=self.fase_atual,
-                callback_rever_introducao=self.mostrar_introducao
+                total_fases=len(self.id_fases),
+                fases_concluidas=self.fase_atual,
+                callback_rever_introducao=lambda: self.mostrar_introducao(self.tela_exercicio),
+                #callback_voltar=self.voltar_para_save
             )
             self.tela_exercicio.carregar_exercicios(id_fase=self.id_fases[self.fase_atual])
+        
         self.tela_atual = "exercicio"
 
-    def avancar(self):
+    def processar_resultado_exercicio(self):
+        """Processa o resultado do exercício e mostra a tela de resultado"""
+        acertou_minimo = self.tela_exercicio.acertos >= 4
+        
+        self.tela_resultado = TelaResultado(
+            self.largura,
+            self.altura,
+            self.tela_exercicio.acertos,
+            self.tela_exercicio.erros,
+            len(self.tela_exercicio.exercicios),
+            callback_avancar=self.avancar_fase,
+            callback_reiniciar=self.reiniciar_exercicio,
+            #callback_voltar=self.voltar_para_save,
+            acertou_minimo=acertou_minimo
+        )
+        
+        if acertou_minimo:
+            self.salvar_progresso()
+            
+        self.tela_atual = "resultado"
+
+    def avancar_fase(self):
+        """Avança para a próxima fase do jogo"""
         if self.fase_atual < len(self.id_fases) - 1:
             self.fase_atual += 1
             self.mostrar_introducao()
         else:
             self.tela_atual = "fim"
 
-    def reiniciar(self):
+    def reiniciar_exercicio(self):
+        """Reinicia o exercício atual"""
         self.tela_exercicio_salva = None
         self.iniciar_exercicio()
 
+    def voltar_para_save(self):
+        """Volta para a tela de seleção de save"""
+        self.salvar_progresso()
+        self.ir_para_tela_save()
+
+    def mostrar_tela_fim(self):
+        """Mostra a tela de conclusão do jogo"""
+        self.tela.fill((30, 40, 50))
+        
+        # Mensagem principal
+        font = pygame.font.SysFont('Arial', 48, bold=True)
+        texto = font.render("Parabéns! Você concluiu todos os tópicos!", True, (100, 255, 100))
+        self.tela.blit(texto, (self.largura//2 - texto.get_width()//2, self.altura//2 - 60))
+        
+        # Estatísticas
+        font_pequena = pygame.font.SysFont('Arial', 24)
+        tempo_total = (pygame.time.get_ticks() - self.tempo_inicio_jogo) // 1000
+        horas, minutos = tempo_total // 3600, (tempo_total % 3600) // 60
+        stats_text = f"Tempo total: {horas}h {minutos}m | Tópicos completos: {len(self.id_fases)}"
+        stats = font_pequena.render(stats_text, True, (200, 200, 200))
+        self.tela.blit(stats, (self.largura//2 - stats.get_width()//2, self.altura//2 + 10))
+        
+        # Botão para voltar
+        botao_voltar = pygame.Rect(self.largura//2 - 100, self.altura//2 + 80, 200, 50)
+        pygame.draw.rect(self.tela, (70, 120, 200), botao_voltar, border_radius=5)
+        texto_voltar = font_pequena.render("Menu Principal", True, (255, 255, 255))
+        self.tela.blit(texto_voltar, (botao_voltar.centerx - texto_voltar.get_width()//2, 
+                                    botao_voltar.centery - texto_voltar.get_height()//2))
+        
+        # Verifica clique no botão
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_click = pygame.mouse.get_pressed()
+        if botao_voltar.collidepoint(mouse_pos) and mouse_click[0]:
+            self.voltar_para_save()
+
     def executar(self):
+        """Loop principal do jogo"""
         rodando = True
         while rodando:
+            dt = self.clock.tick(60)  # Limita a 60 FPS e obtém delta time
+            
+            # Trata eventos
             eventos = pygame.event.get()
             for evento in eventos:
                 if evento.type == pygame.QUIT:
@@ -98,16 +235,24 @@ class GameManager:
             if not rodando:
                 break
 
+            # Renderização condicional das telas
             if self.tela_atual == "inicio":
                 self.tela_inicio.tratar_eventos(eventos)
                 self.tela_inicio.desenhar(self.tela)
 
             elif self.tela_atual == "save":
-                self.tela_save.tratar_eventos(eventos)
+                resultado = self.tela_save.tratar_eventos(eventos)
+                if resultado == "voltar":
+                    self.tela_atual = "inicio"
                 self.tela_save.desenhar(self.tela)
 
+            elif self.tela_atual == "criar_jogador":
+                self.tela_criar_jogador.tratar_eventos(eventos)
+                self.tela_criar_jogador.atualizar(dt)
+                self.tela_criar_jogador.desenhar(self.tela)
+
             elif self.tela_atual in ["introducao", "exercicio", "resultado"]:
-                self.tela.blit(self.fundo_principal, (0, 0))  # fundo fixo
+                self.tela.blit(self.fundo_principal, (0, 0))  # Fundo fixo
 
                 if self.tela_atual == "introducao":
                     self.tela_introducao.tratar_eventos(eventos)
@@ -116,28 +261,16 @@ class GameManager:
                 elif self.tela_atual == "exercicio":
                     self.tela_exercicio.tratar_eventos(eventos)
                     self.tela_exercicio.desenhar(self.tela)
-                    if self.tela_exercicio.finalizado:
-                        acertou_minimo = self.tela_exercicio.acertos >= 4
-                        self.tela_resultado = TelaResultado(
-                            self.largura, self.altura,
-                            self.tela_exercicio.acertos, self.tela_exercicio.erros, len(self.tela_exercicio.exercicios),
-                            callback_avancar=self.avancar,
-                            callback_reiniciar=self.reiniciar,
-                            acertou_minimo=acertou_minimo
-                        )
-                        self.tela_atual = "resultado"
+                    if hasattr(self.tela_exercicio, 'finalizado') and self.tela_exercicio.finalizado:
+                        self.processar_resultado_exercicio()
 
                 elif self.tela_atual == "resultado":
                     self.tela_resultado.tratar_eventos(eventos)
                     self.tela_resultado.desenhar(self.tela)
 
             elif self.tela_atual == "fim":
-                self.tela.fill((30, 30, 30))
-                font = pygame.font.SysFont('Arial', 36)
-                texto = font.render("Parabéns! Você concluiu todos os tópicos!", True, (80, 255, 80))
-                self.tela.blit(texto, (self.largura//2 - texto.get_width()//2, self.altura//2))
+                self.mostrar_tela_fim()
 
             pygame.display.flip()
-            self.clock.tick(60)
 
         pygame.quit()
