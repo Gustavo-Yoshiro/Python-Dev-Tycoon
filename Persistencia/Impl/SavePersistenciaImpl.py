@@ -6,15 +6,15 @@ class SavePersistenciaImpl(SavePersistencia):
     def __init__(self):
         self.__bd = BancoDeDados()
 
-    def salvar(self, save: Save):
+    def salvar(self, id_jogador, data_save,tempo_jogo):
         sql = """
             INSERT INTO save (id_jogador, data_save, tempo_jogo)
             VALUES (?, ?, ?)
         """
         parametros = (
-            save.get_id_jogador(),
-            save.get_data_save(),
-            save.get_tempo_jogo()
+            id_jogador,
+            data_save,
+            tempo_jogo
         )
         return self.__bd.executar(sql, parametros)
 

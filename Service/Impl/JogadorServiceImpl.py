@@ -13,10 +13,8 @@ class JogadorServiceImpl(JogadorService):
             raise ValueError("Nome do jogador não pode ser vazio!")
 
         # Busca fase "Iniciante" (por tipo), assume que sempre existe pelo menos uma!
-        fases_iniciante = [f for f in self.fase_persistencia.listar_todos() if f.get_tipo_fase() == "Iniciante"]
-        if not fases_iniciante:
-            raise Exception("Nenhuma fase 'Iniciante' cadastrada!")
-        id_fase = fases_iniciante[0].get_id_fase()
+
+        id_fase = 1
 
         # Atributos iniciais fixos
         social = 0
