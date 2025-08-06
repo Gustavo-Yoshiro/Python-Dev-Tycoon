@@ -9,10 +9,12 @@ from UI.TelaIntroducaoTopico import TelaIntroducaoTopico
 from Service.Impl.FaseServiceImpl import FaseServiceImpl
 from Service.Impl.SaveServiceImpl import SaveServiceImpl
 from Service.Impl.JogadorServiceImpl import JogadorServiceImpl
+from Service.Impl.ProgressoFaseServiceImpl import ProgressoFaseServiceImpl
 
 class GameManager:
     def __init__(self):
         pygame.init()
+        pygame.key.set_repeat(300, 30)
         self.tela = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         self.largura, self.altura = self.tela.get_size()
         self.clock = pygame.time.Clock()
@@ -98,9 +100,15 @@ class GameManager:
         self.mostrar_introducao()
 
     def carregar_progresso(self):
-        """Carrega o progresso do save atual"""
-        if self.save_atual and hasattr(self.save_atual, 'get_progresso'):
-            self.fase_atual = min(self.save_atual.get_progresso(), len(self.id_fases) - 1)
+        # Igual ao SEU código que funciona!
+        
+        progresso_service = ProgressoFaseServiceImpl()
+        ultima_fase = progresso_service.progresso_persistencia.buscar_ultima_fase_do_jogador(self.jogador_atual.get_id_jogador())
+        if ultima_fase and ultima_fase in self.id_fases:
+            self.fase_atual = self.id_fases.index(ultima_fase)
+        else:
+            self.fase_atual = 0
+
 
     def salvar_progresso(self):
         """Atualiza o save com o progresso atual"""
@@ -111,43 +119,48 @@ class GameManager:
             self.save_service.atualizar_save(self.save_atual)
 
     def mostrar_introducao(self, tela_salva=None):
-        """Mostra a tela de introdução do tópico atual"""
         id_fase = self.id_fases[self.fase_atual]
         fase = self.fase_service.buscar_fase_por_id(id_fase)
         nome_topico = fase.get_topico()
         descricao = fase.get_introducao()
         self.nome_topico_atual = nome_topico
-        
+
+        # --- PASSA O JOGADOR ---
         self.tela_introducao = TelaIntroducaoTopico(
             self.largura,
             self.altura,
             nome_topico,
             descricao,
             on_confirmar=self.iniciar_exercicio,
-            #on_voltar=self.voltar_para_save
+            jogador=self.jogador_atual  # <--- AQUI!
         )
         self.tela_atual = "introducao"
         if tela_salva:
             self.tela_exercicio_salva = tela_salva
 
     def iniciar_exercicio(self):
-        """Inicia a tela de exercícios para o tópico atual"""
+        q_x = int(self.largura * 0.25) + int(self.largura * 0.54) - 90
+        q_y = int(self.altura * 0.13) + 10
+        q_centro = (q_x + 15, q_y + 15)
+        pygame.mouse.set_pos(q_centro)
         if self.tela_exercicio_salva is not None:
             self.tela_exercicio = self.tela_exercicio_salva
             self.tela_exercicio_salva = None
         else:
             self.tela_exercicio = TelaExercicio(
-                self.largura,
-                self.altura,
-                self.nome_topico_atual,
-                total_fases=len(self.id_fases),
-                fases_concluidas=self.fase_atual,
-                callback_rever_introducao=lambda: self.mostrar_introducao(self.tela_exercicio),
-                #callback_voltar=self.voltar_para_save
-            )
-            self.tela_exercicio.carregar_exercicios(id_fase=self.id_fases[self.fase_atual])
-        
+            self.largura,
+            self.altura,
+            self.nome_topico_atual,
+            total_fases=len(self.id_fases),
+            fases_concluidas=self.fase_atual,
+            callback_rever_introducao=self.mostrar_introducao,
+            jogador=self.jogador_atual,
+            id_fase=self.id_fases[self.fase_atual]
+        )
+        # NÃO CHAME self.tela_exercicio.carregar_exercicios AQUI!
+
         self.tela_atual = "exercicio"
+
 
     def processar_resultado_exercicio(self):
         """Processa o resultado do exercício e mostra a tela de resultado"""
@@ -179,9 +192,15 @@ class GameManager:
             self.tela_atual = "fim"
 
     def reiniciar_exercicio(self):
-        """Reinicia o exercício atual"""
+        from Service.Impl.ProgressoFaseServiceImpl import ProgressoFaseServiceImpl
+        progresso_service = ProgressoFaseServiceImpl()
+        progresso_service.deletar_progresso_por_jogador_fase(
+            self.jogador_atual.get_id_jogador(),
+            self.id_fases[self.fase_atual]
+        )
         self.tela_exercicio_salva = None
         self.iniciar_exercicio()
+
 
     def voltar_para_save(self):
         """Volta para a tela de seleção de save"""
