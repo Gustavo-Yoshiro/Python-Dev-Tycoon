@@ -6,14 +6,10 @@ class SaveServiceImpl(SaveService):
     def __init__(self):
         self.__persistencia = SavePersistenciaImpl()
 
-    def adicionar_save(self, save: Save):
-        jogador_id = save.get_id_jogador()
+    def adicionar_save(self,id_jogador,data_save,tempo_jogo):
 
-        if self.__persistencia.pode_salvar(jogador_id):
-            return self.__persistencia.salvar(save)
-        else:
-            print(f" Jogador {jogador_id} já possui 3 saves. Delete um existente para salvar novamente.")
-            return None
+        return self.__persistencia.salvar(id_jogador,data_save,tempo_jogo)
+        
 
     def buscar_save(self, id_save: int) -> Save:
         return self.__persistencia.buscar_por_id(id_save)
