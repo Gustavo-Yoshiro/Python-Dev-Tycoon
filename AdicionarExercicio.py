@@ -16,15 +16,15 @@ exercicios = [
         resposta_erradas="print(x + y)|show(x, y)|display(x, y)"),
 
     Exercicio(id_exercicio=None, id_fase=1,
-        dicas="Digite exatamente o comando pedido.",
-        pergunta="Dissertativa: Escreva o comando para exibir o texto 'Bem-vindo!' na tela. (Use aspas duplas)",
-        tipo="dissertativa", resposta_certa='print("Bem-vindo!")',
+        dicas="Use o comando print para mostrar a mensagem.",
+        pergunta="Dissertativa: Escreva o código Python que imprime na tela: Hello World!",
+        tipo="dissertativa", resposta_certa='Hello World!',
         resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=1,
-        dicas="Use print() com uma string e um número.",
-        pergunta="Dissertativa: Escreva o comando para exibir 'Idade: 21' usando uma string e o número.",
-        tipo="dissertativa", resposta_certa='print("Idade:", 21)',
+        dicas="A saída deve conter o texto pedido.",
+        pergunta="Dissertativa: Escreva um código que exibe: Python é divertido!",
+        tipo="dissertativa", resposta_certa='Python é divertido!',
         resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=1,
@@ -53,16 +53,14 @@ exercicios = [
         resposta_erradas='input(nome)|nome == input()|input("Digite seu nome: ") = nome'),
 
     Exercicio(id_exercicio=None, id_fase=2,
-        dicas="Use input e depois print, igual ao exemplo da fase.",
-        pergunta="Dissertativa: Escreva um código para pedir ao usuário seu nome e exibir 'Olá, <nome>' (Exatamente como abaixo)\nResposta esperada:\nnome = input(\"Qual seu nome? \")\nprint(\"Olá,\", nome)",
-        tipo="dissertativa", resposta_certa='nome = input("Qual seu nome? ")\nprint("Olá,", nome)',
-        resposta_erradas=None),
+        dicas="Peça ao usuário seu nome e imprima: Olá, <nome>. Considere que o usuário digita Ana.",
+        pergunta="Dissertativa: Peça ao usuário seu nome e imprima: Olá, <nome>. Considere que o usuário digita Ana.",
+        tipo="dissertativa", resposta_certa='Olá, Ana', resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=2,
-        dicas="Primeiro input, depois print.",
-        pergunta="Dissertativa: Escreva um código para pedir o animal favorito e mostrar na tela.",
-        tipo="dissertativa", resposta_certa='animal = input("Animal favorito? ")\nprint(animal)',
-        resposta_erradas=None),
+        dicas="Peça a cor favorita e imprima junto da frase. Considere que o usuário digita azul.",
+        pergunta="Dissertativa: Peça a cor favorita do usuário e imprima: Sua cor favorita é <cor>. Considere que o usuário digita azul.",
+        tipo="dissertativa", resposta_certa='Sua cor favorita é azul', resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=2,
         dicas="Arraste os blocos para a ordem correta.",
@@ -90,16 +88,17 @@ exercicios = [
         resposta_erradas="cidade == 'São Paulo'|let cidade = 'São Paulo'|cidade := 'São Paulo'"),
 
     Exercicio(id_exercicio=None, id_fase=3,
-        dicas="Digite igual ao exemplo.",
-        pergunta="Dissertativa: Crie uma variável chamada ano e atribua o valor 2025.",
-        tipo="dissertativa", resposta_certa="ano = 2025",
+        dicas="Crie a variável e exiba seu valor.",
+        pergunta="Dissertativa: Crie uma variável chamada ano, atribua o valor 2025 e mostre o valor dela na tela.",
+        tipo="dissertativa", resposta_certa="2025",
         resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=3,
-        dicas="Dica: o nome pode ser qualquer um, mas use o do exemplo.",
-        pergunta="Dissertativa: Crie uma variável chamada cor e atribua o valor 'azul'.",
-        tipo="dissertativa", resposta_certa="cor = 'azul'",
+        dicas="Crie a variável com o valor exato e exiba.",
+        pergunta="Dissertativa: Crie uma variável chamada cor e atribua o valor 'azul'. Depois, mostre esse valor na tela.",
+        tipo="dissertativa", resposta_certa="azul",
         resposta_erradas=None),
+
 
     Exercicio(id_exercicio=None, id_fase=3,
         dicas="Monte a atribuição correta.",
