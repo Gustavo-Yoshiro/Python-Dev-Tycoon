@@ -10,8 +10,8 @@ class TelaSave:
         self.callback_criar_jogador = callback_criar_jogador
         
         # Configuração visual
-        self.fundo = pygame.Surface((largura, altura))
-        self.fundo.fill((30, 30, 40))
+        self.fundo = pygame.image.load("Assets/TelaSave.png").convert()
+        self.fundo = pygame.transform.scale(self.fundo, (largura, altura))
         
         # Fontes
         self.fonte_titulo = pygame.font.SysFont("Arial", 48, bold=True)
@@ -30,11 +30,13 @@ class TelaSave:
         self.slots_usados = {save.get_id_jogador(): save for save in self.saves}
 
     def criar_slots(self):
-        """Cria os retângulos para os slots de save"""
+        """Cria os retângulos para os slots de save (empilhados verticalmente)"""
         slot_width = self.largura * 0.7
         slot_height = 120
         start_y = 180
-        
+
+        self.slots = []
+
         for i in range(3):
             rect = pygame.Rect(
                 (self.largura - slot_width) // 2,
@@ -60,12 +62,27 @@ class TelaSave:
             self.botao_voltar.y + (self.botao_voltar.height - texto_voltar.get_height()) // 2
         ))
         
-        # Slots de save
+       # Paleta de cores combinando com o fundo
+        COR_SLOT_1 = (20, 30, 60, 120)   # tom mais escuro
+        COR_SLOT_HOVER_1 = (120, 250, 200, 220)
+        COR_BORDA = (60, 90, 140)  # azul médio para bordas
+
+        pos_mouse = pygame.mouse.get_pos()
+
         for i, slot in enumerate(self.slots):
-            # Fundo do slot
-            cor_slot = (80, 80, 90) if i % 2 == 0 else (70, 70, 80)
-            pygame.draw.rect(tela, cor_slot, slot, border_radius=10)
-            pygame.draw.rect(tela, (100, 100, 110), slot, width=3, border_radius=10)
+            slot_surface = pygame.Surface((slot.width, slot.height), pygame.SRCALPHA)
+
+            mouse_em_cima = slot.collidepoint(pos_mouse)
+
+            if mouse_em_cima:
+                cor_slot = COR_SLOT_HOVER_1 
+            else:
+                cor_slot = COR_SLOT_1 
+
+            pygame.draw.rect(slot_surface, cor_slot, slot_surface.get_rect(), border_radius=10)
+            tela.blit(slot_surface, (slot.x, slot.y))
+
+            pygame.draw.rect(tela, COR_BORDA, slot, width=3, border_radius=10)
             
             if i < len(self.saves):
                 self.desenhar_slot_preenchido(tela, slot, i)
@@ -75,40 +92,36 @@ class TelaSave:
     def desenhar_slot_preenchido(self, tela, slot, indice):
         save = self.saves[indice]
         jogador = self.jogador_service.buscar_jogador_por_id(save.get_id_jogador())
-        
-        # Nome do save e jogador
+
+        # Parte da imagem (simula screenshot ou avatar)
+        imagem_dummy = pygame.Surface((100, 75))
+        imagem_dummy.fill((50, 100, 150))  # Cor exemplo
+        tela.blit(imagem_dummy, (slot.x + 15, slot.y + 20))
+
+        # Nome do save
         texto_nome = self.fonte_normal.render(
-            f"{'Save'} - {jogador.get_nome()}", 
-            True, (255, 255, 255)
+            f"{jogador.get_nome()}", True, (0, 0, 0)
         )
-        tela.blit(texto_nome, (slot.x + 20, slot.y + 20))
-        
-        # Data e progresso
-        data_formatada = save.get_data_save()
+        tela.blit(texto_nome, (slot.x + 130, slot.y + 20))
+
+        # Fase atual
+        '''progresso = self.jogador_service.buscar_progresso(jogador.get_id_jogador())
+        texto_fase_str = f"Fase: {progresso['fase']}" if progresso else "Fase: N/A"
+        texto_fase = self.fonte_normal.render(texto_fase_str, True, (0, 0, 0))
+        tela.blit(texto_fase, (slot.x + 130, slot.y + 50))'''
+
+        # Data
         texto_data = self.fonte_pequena.render(
-            f"Criado em: {data_formatada}", 
-            True, (200, 200, 200)
+            save.get_data_save(), True, (100, 100, 100)
         )
-        tela.blit(texto_data, (slot.x + 20, slot.y + 60))
-        
-        '''# Progresso
-        texto_progresso = self.fonte_pequena.render(
-            f"Progresso: {save.get_progresso()}/8 tópicos", 
-            True, (180, 220, 180)
-        )
-        tela.blit(texto_progresso, (slot.x + slot.width - 250, slot.y + 60))'''
+        tela.blit(texto_data, (slot.x + slot.width - 150, slot.y + 20))
+
 
     def desenhar_slot_vazio(self, tela, slot, indice):
-        # Texto "Slot vazio"
-        texto_vazio = self.fonte_normal.render("Slot Vazio - Novo Jogo", True, (180, 180, 180))
-        tela.blit(texto_vazio, (slot.x + 20, slot.y + 20))
         
-        # Ícone de "+"
-        texto_mais = self.fonte_titulo.render("+", True, (150, 150, 150))
-        tela.blit(texto_mais, (
-            slot.x + slot.width - 50, 
-            slot.y + (slot.height - texto_mais.get_height()) // 2
-        ))
+        # Texto “New Game”
+        texto = self.fonte_normal.render("Novo Jogo", True, (60, 60, 60))
+        tela.blit(texto, (slot.x + 110, slot.y + (slot.height - texto.get_height()) // 2))
 
     def tratar_eventos(self, eventos):
         for evento in eventos:

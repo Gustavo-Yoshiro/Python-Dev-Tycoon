@@ -22,3 +22,7 @@ class JogadorPersistencia(ABC):
     @abstractmethod
     def atualizar(self, jogador: Jogador):
         pass
+
+    @abstractmethod
+    def buscar_progresso(self, id_jogador):
+        pass

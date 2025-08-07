@@ -53,3 +53,33 @@ class JogadorPersistenciaImpl(JogadorPersistencia):
             jogador.get_id_jogador()
         )
         self.__bd.executar(sql, parametros)
+
+    def buscar_progresso(self, id_jogador):
+        try:
+            # Verifica se o ID é válido
+            if not isinstance(id_jogador, int) or id_jogador <= 0:
+                raise ValueError("O ID do jogador deve ser um número inteiro positivo.")
+
+            sql = """
+                SELECT p.*
+                FROM jogador AS j
+                JOIN progresso_fase AS p ON j.id_jogador = p.id_jogador
+                WHERE j.id_jogador = ?
+            """
+
+            progresso = self.__bd.executar_query(sql, (id_jogador,), fetchone=True)
+
+            if progresso:
+                print("✅ Progresso encontrado:", progresso)
+                return progresso
+            else:
+                print("⚠️ Nenhum progresso encontrado para o jogador com ID:", id_jogador)
+                return None
+
+        except ValueError as ve:
+            print("❌ Erro de validação:", ve)
+            return None
+
+        except Exception as e:
+            print("❌ Erro inesperado ao buscar progresso:", str(e))
+            return None

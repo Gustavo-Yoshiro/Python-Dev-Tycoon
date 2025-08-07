@@ -37,4 +37,7 @@ class JogadorService(ABC):
     def mudar_fase(self, id_jogador, nova_fase):
         pass
 
+    @abstractmethod
+    def buscar_progresso(self, id_jogador):
+        pass
     # Outros métodos de negócio que quiser!

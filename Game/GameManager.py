@@ -18,7 +18,7 @@ class GameManager:
         self.tela = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         self.largura, self.altura = self.tela.get_size()
         self.clock = pygame.time.Clock()
-        pygame.display.set_caption("Python Learning Game")
+        pygame.display.set_caption("Python Dev Tycoon")
 
         # Serviços
         self.fase_service = FaseServiceImpl()
