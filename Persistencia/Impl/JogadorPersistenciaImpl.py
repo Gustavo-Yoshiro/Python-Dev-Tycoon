@@ -54,26 +54,26 @@ class JogadorPersistenciaImpl(JogadorPersistencia):
         )
         self.__bd.executar(sql, parametros)
 
-    def buscar_progresso(self, id_jogador):
+    def buscar_tipo_fase_atual(self, id_jogador):
         try:
-            # Verifica se o ID é válido
+            # Validação básica
             if not isinstance(id_jogador, int) or id_jogador <= 0:
                 raise ValueError("O ID do jogador deve ser um número inteiro positivo.")
 
             sql = """
-                SELECT p.*
+                SELECT f.tipo_fase
                 FROM jogador AS j
-                JOIN progresso_fase AS p ON j.id_jogador = p.id_jogador
+                JOIN fase AS f ON j.id_fase = f.id_fase
                 WHERE j.id_jogador = ?
             """
 
-            progresso = self.__bd.executar_query(sql, (id_jogador,), fetchone=True)
+            resultado = self.__bd.executar_query(sql, (id_jogador,), fetchone=True)
 
-            if progresso:
-                print("✅ Progresso encontrado:", progresso)
-                return progresso
+            if resultado:
+                tipo_fase = resultado[0]
+                return tipo_fase
             else:
-                print("⚠️ Nenhum progresso encontrado para o jogador com ID:", id_jogador)
+                print("⚠️ Fase não encontrada para o jogador.")
                 return None
 
         except ValueError as ve:
@@ -81,5 +81,31 @@ class JogadorPersistenciaImpl(JogadorPersistencia):
             return None
 
         except Exception as e:
-            print("❌ Erro inesperado ao buscar progresso:", str(e))
+            print("❌ Erro inesperado ao buscar tipo da fase:", str(e))
             return None
+    
+    def avancar_fase_jogador(self, id_jogador: int):
+        try:
+            # Consulta a fase atual do jogador
+            sql_fase_atual = "SELECT id_fase FROM jogador WHERE id_jogador = ?"
+            fase_atual = self.__bd.executar_query(sql_fase_atual, (id_jogador,), fetchone=True)
+
+            # Consulta a última fase disponível
+            sql_ultima_fase = "SELECT MAX(id_fase) FROM fase"
+            ultima_fase = self.__bd.executar_query(sql_ultima_fase, fetchone=True)
+
+            if fase_atual and ultima_fase:
+                id_fase_atual = fase_atual[0]
+                id_ultima_fase = ultima_fase[0]
+
+                if id_fase_atual is not None and id_fase_atual < id_ultima_fase:
+                    # Atualiza o jogador para a próxima fase
+                    sql_update = "UPDATE jogador SET id_fase = id_fase + 1 WHERE id_jogador = ?"
+                    self.__bd.executar(sql_update, (id_jogador,))
+                    print(f"Jogador {id_jogador} avançou para a fase {id_fase_atual + 1}.")
+                else:
+                    print("Jogador já está na última fase.")
+            else:
+                print("Não foi possível obter os dados de fase.")
+        except Exception as e:
+            print("Erro ao tentar avançar fase:", e)

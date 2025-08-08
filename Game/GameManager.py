@@ -116,9 +116,15 @@ class GameManager:
         """Atualiza o save com o progresso atual"""
         if self.save_atual:
             tempo_de_jogo = (pygame.time.get_ticks() - self.tempo_inicio_jogo) // 1000
-            #self.save_atual.set_progresso(self.fase_atual)
+            data_atual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Formato legível
+
+            # Atualiza tempo e data
             self.save_atual.set_tempo_jogo(tempo_de_jogo)
+            self.save_atual.set_data_modificacao(data_atual)
+
+            # Atualiza o save no serviço
             self.save_service.atualizar_save(self.save_atual)
+
 
     def mostrar_introducao(self, tela_salva=None):
         id_fase = self.id_fases[self.fase_atual]

@@ -1,4 +1,5 @@
 import pygame
+from datetime import datetime
 
 class TelaSave:
     def __init__(self, largura, altura, save_service, jogador_service, callback_selecionar_slot, callback_criar_jogador):
@@ -64,7 +65,7 @@ class TelaSave:
         
        # Paleta de cores combinando com o fundo
         COR_SLOT_1 = (20, 30, 60, 120)   # tom mais escuro
-        COR_SLOT_HOVER_1 = (120, 250, 200, 220)
+        COR_SLOT_HOVER_1 = (100, 140, 200, 220)  # azul suave com leve brilho
         COR_BORDA = (60, 90, 140)  # azul médio para bordas
 
         pos_mouse = pygame.mouse.get_pos()
@@ -88,31 +89,51 @@ class TelaSave:
                 self.desenhar_slot_preenchido(tela, slot, i)
             else:
                 self.desenhar_slot_vazio(tela, slot, i)
-
     def desenhar_slot_preenchido(self, tela, slot, indice):
         save = self.saves[indice]
         jogador = self.jogador_service.buscar_jogador_por_id(save.get_id_jogador())
 
-        # Parte da imagem (simula screenshot ou avatar)
-        imagem_dummy = pygame.Surface((100, 75))
-        imagem_dummy.fill((50, 100, 150))  # Cor exemplo
-        tela.blit(imagem_dummy, (slot.x + 15, slot.y + 20))
+        # Buscar tipo da fase atual
+        tipo_fase = self.jogador_service.buscar_tipo_fase_atual(jogador.get_id_jogador())
 
-        # Nome do save
+        # Escolher imagem com base no tipo da fase
+        if tipo_fase and tipo_fase.lower() == "iniciante":
+            caminho_imagem = "assets/TelaJogoIniciante.png"
+        else:
+            caminho_imagem = "assets/TelaJogoIntermediario.png"
+
+        # Carregar imagem da fase
+        try:
+            imagem_fase = pygame.image.load(caminho_imagem)
+            imagem_fase = pygame.transform.scale(imagem_fase, (130, 100))  # imagem maior
+        except Exception as e:
+            print("Erro ao carregar imagem da fase:", e)
+            imagem_fase = pygame.Surface((120, 90))
+            imagem_fase.fill((150, 0, 0))  # fallback visual
+
+        tela.blit(imagem_fase, (slot.x + 10, slot.y + 10))
+
+        # Nome do jogador
         texto_nome = self.fonte_normal.render(
             f"{jogador.get_nome()}", True, (0, 0, 0)
         )
-        tela.blit(texto_nome, (slot.x + 130, slot.y + 20))
+        tela.blit(texto_nome, (slot.x + 145, slot.y + 20))
 
-        # Fase atual
-        '''progresso = self.jogador_service.buscar_progresso(jogador.get_id_jogador())
-        texto_fase_str = f"Fase: {progresso['fase']}" if progresso else "Fase: N/A"
-        texto_fase = self.fonte_normal.render(texto_fase_str, True, (0, 0, 0))
-        tela.blit(texto_fase, (slot.x + 130, slot.y + 50))'''
+        # Fase atual (em branco)
+        texto_fase_str = f"Fase: {tipo_fase}" if tipo_fase else "Fase: N/A"
+        texto_fase = self.fonte_normal.render(texto_fase_str, True, (255, 255, 255))
+        tela.blit(texto_fase, (slot.x + 145, slot.y + 50))
 
-        # Data
+        # Data do save (formatada sem segundos)
+        try:
+            data_obj = datetime.strptime(save.get_data_save(), "%Y-%m-%d %H:%M:%S.%f")
+            data_formatada = data_obj.strftime("%d/%m/%Y %H:%M")
+        except Exception as e:
+            print("Erro ao formatar data:", e)
+            data_formatada = save.get_data_save()
+
         texto_data = self.fonte_pequena.render(
-            save.get_data_save(), True, (100, 100, 100)
+            data_formatada, True, (100, 100, 100)
         )
         tela.blit(texto_data, (slot.x + slot.width - 150, slot.y + 20))
 
@@ -120,7 +141,7 @@ class TelaSave:
     def desenhar_slot_vazio(self, tela, slot, indice):
         
         # Texto “New Game”
-        texto = self.fonte_normal.render("Novo Jogo", True, (60, 60, 60))
+        texto = self.fonte_normal.render("Novo Jogo", True, (255, 255, 255))
         tela.blit(texto, (slot.x + 110, slot.y + (slot.height - texto.get_height()) // 2))
 
     def tratar_eventos(self, eventos):
