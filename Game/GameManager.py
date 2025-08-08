@@ -79,15 +79,16 @@ class GameManager:
         #avisar gustavo
         id_novo_jogador = self.jogador_service.criar_jogador(nome_jogador)
         self.jogador_atual = self.jogador_service.buscar_jogador_por_id(id_novo_jogador)
-
+        data_formatada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         novo_save = self.save_service.adicionar_save(
             id_jogador=id_novo_jogador,
-            data_save=datetime.now(),
+            data_save=data_formatada,
             tempo_jogo=0,
         )
+        
         #não sei se essa função buscar_save_por_id é para fazer oq? tava dando erro
         #self.save_atual = self.save_service.buscar_save_por_id(novo_save)
-        #self.tempo_inicio_jogo = pygame.time.get_ticks()
+        self.tempo_inicio_jogo = pygame.time.get_ticks()
         
         # Inicia o jogo
         self.carregar_progresso()

@@ -100,3 +100,6 @@ class JogadorServiceImpl(JogadorService):
 
     def avancar_fase_jogador(self, id_jogador: int):
         return self.jogador_persistencia.avancar_fase_jogador(id_jogador)
+
+    def apagar_jogador(self, id_jogador):
+        return self.jogador_persistencia.apagar_jogador(id_jogador)

@@ -108,3 +108,19 @@ class BancoDeDados:
             raise
         finally:
             con.close()
+    
+    def executar_multiplos(self, comandos):
+        """Executa múltiplos comandos SQL em uma única transação"""
+        try:
+            con = self.conectar()
+            cursor = con.cursor()
+            con.execute("BEGIN")
+            for sql, params in comandos:
+                cursor.execute(sql, params)
+            con.commit()
+        except sqlite3.Error as erro:
+            con.rollback()
+            print("Erro ao executar múltiplos comandos:", erro)
+            raise
+        finally:
+            con.close()

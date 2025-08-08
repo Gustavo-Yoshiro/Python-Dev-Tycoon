@@ -44,4 +44,8 @@ class JogadorService(ABC):
     @abstractmethod
     def avancar_fase_jogador(self, id_jogador: int):
         pass
+
+    @abstractmethod
+    def apagar_jogador(self, id_jogador:int):
+        pass
     # Outros métodos de negócio que quiser!

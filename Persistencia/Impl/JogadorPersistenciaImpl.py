@@ -109,3 +109,22 @@ class JogadorPersistenciaImpl(JogadorPersistencia):
                 print("Não foi possível obter os dados de fase.")
         except Exception as e:
             print("Erro ao tentar avançar fase:", e)
+    def apagar_jogador(self, id_jogador):
+        """
+        Apaga o jogador e todos os dados relacionados:
+        - saves
+        - progresso nas fases
+        - registro do jogador
+        Tudo é feito em uma única transação.
+        """
+        comandos = [
+            ("DELETE FROM save WHERE id_jogador = ?", (id_jogador,)),
+            ("DELETE FROM progresso_fase WHERE id_jogador = ?", (id_jogador,)),
+            ("DELETE FROM jogador WHERE id_jogador = ?", (id_jogador,))
+        ]
+        
+        try:
+            self.__bd.executar_multiplos(comandos)
+            print(f"Jogador {id_jogador} e dados relacionados foram apagados com sucesso.")
+        except Exception as e:
+            print(f"Erro ao apagar jogador {id_jogador}: {e}")
