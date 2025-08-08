@@ -94,3 +94,12 @@ class JogadorServiceImpl(JogadorService):
             raise Exception("Nova fase não existe!")
         jogador.set_id_fase(nova_fase)
         self.jogador_persistencia.atualizar(jogador)
+
+    def buscar_tipo_fase_atual(self, id_jogador):
+        return self.jogador_persistencia.buscar_tipo_fase_atual(id_jogador)
+
+    def avancar_fase_jogador(self, id_jogador: int):
+        return self.jogador_persistencia.avancar_fase_jogador(id_jogador)
+
+    def apagar_jogador(self, id_jogador):
+        return self.jogador_persistencia.apagar_jogador(id_jogador)

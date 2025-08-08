@@ -53,3 +53,78 @@ class JogadorPersistenciaImpl(JogadorPersistencia):
             jogador.get_id_jogador()
         )
         self.__bd.executar(sql, parametros)
+
+    def buscar_tipo_fase_atual(self, id_jogador):
+        try:
+            # Validação básica
+            if not isinstance(id_jogador, int) or id_jogador <= 0:
+                raise ValueError("O ID do jogador deve ser um número inteiro positivo.")
+
+            sql = """
+                SELECT f.tipo_fase
+                FROM jogador AS j
+                JOIN fase AS f ON j.id_fase = f.id_fase
+                WHERE j.id_jogador = ?
+            """
+
+            resultado = self.__bd.executar_query(sql, (id_jogador,), fetchone=True)
+
+            if resultado:
+                tipo_fase = resultado[0]
+                return tipo_fase
+            else:
+                print("⚠️ Fase não encontrada para o jogador.")
+                return None
+
+        except ValueError as ve:
+            print("❌ Erro de validação:", ve)
+            return None
+
+        except Exception as e:
+            print("❌ Erro inesperado ao buscar tipo da fase:", str(e))
+            return None
+    
+    def avancar_fase_jogador(self, id_jogador: int):
+        try:
+            # Consulta a fase atual do jogador
+            sql_fase_atual = "SELECT id_fase FROM jogador WHERE id_jogador = ?"
+            fase_atual = self.__bd.executar_query(sql_fase_atual, (id_jogador,), fetchone=True)
+
+            # Consulta a última fase disponível
+            sql_ultima_fase = "SELECT MAX(id_fase) FROM fase"
+            ultima_fase = self.__bd.executar_query(sql_ultima_fase, fetchone=True)
+
+            if fase_atual and ultima_fase:
+                id_fase_atual = fase_atual[0]
+                id_ultima_fase = ultima_fase[0]
+
+                if id_fase_atual is not None and id_fase_atual < id_ultima_fase:
+                    # Atualiza o jogador para a próxima fase
+                    sql_update = "UPDATE jogador SET id_fase = id_fase + 1 WHERE id_jogador = ?"
+                    self.__bd.executar(sql_update, (id_jogador,))
+                    print(f"Jogador {id_jogador} avançou para a fase {id_fase_atual + 1}.")
+                else:
+                    print("Jogador já está na última fase.")
+            else:
+                print("Não foi possível obter os dados de fase.")
+        except Exception as e:
+            print("Erro ao tentar avançar fase:", e)
+    def apagar_jogador(self, id_jogador):
+        """
+        Apaga o jogador e todos os dados relacionados:
+        - saves
+        - progresso nas fases
+        - registro do jogador
+        Tudo é feito em uma única transação.
+        """
+        comandos = [
+            ("DELETE FROM save WHERE id_jogador = ?", (id_jogador,)),
+            ("DELETE FROM progresso_fase WHERE id_jogador = ?", (id_jogador,)),
+            ("DELETE FROM jogador WHERE id_jogador = ?", (id_jogador,))
+        ]
+        
+        try:
+            self.__bd.executar_multiplos(comandos)
+            print(f"Jogador {id_jogador} e dados relacionados foram apagados com sucesso.")
+        except Exception as e:
+            print(f"Erro ao apagar jogador {id_jogador}: {e}")

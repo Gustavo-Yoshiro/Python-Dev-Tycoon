@@ -18,7 +18,7 @@ class GameManager:
         self.tela = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         self.largura, self.altura = self.tela.get_size()
         self.clock = pygame.time.Clock()
-        pygame.display.set_caption("Python Learning Game")
+        pygame.display.set_caption("Python Dev Tycoon")
 
         # Serviços
         self.fase_service = FaseServiceImpl()
@@ -79,15 +79,16 @@ class GameManager:
         #avisar gustavo
         id_novo_jogador = self.jogador_service.criar_jogador(nome_jogador)
         self.jogador_atual = self.jogador_service.buscar_jogador_por_id(id_novo_jogador)
-
+        data_formatada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         novo_save = self.save_service.adicionar_save(
             id_jogador=id_novo_jogador,
-            data_save=datetime.now(),
+            data_save=data_formatada,
             tempo_jogo=0,
         )
+        
         #não sei se essa função buscar_save_por_id é para fazer oq? tava dando erro
         #self.save_atual = self.save_service.buscar_save_por_id(novo_save)
-        #self.tempo_inicio_jogo = pygame.time.get_ticks()
+        self.tempo_inicio_jogo = pygame.time.get_ticks()
         
         # Inicia o jogo
         self.carregar_progresso()
@@ -116,9 +117,15 @@ class GameManager:
         """Atualiza o save com o progresso atual"""
         if self.save_atual:
             tempo_de_jogo = (pygame.time.get_ticks() - self.tempo_inicio_jogo) // 1000
-            #self.save_atual.set_progresso(self.fase_atual)
+            data_atual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Formato legível
+
+            # Atualiza tempo e data
             self.save_atual.set_tempo_jogo(tempo_de_jogo)
+            self.save_atual.set_data_save(data_atual)
+
+            # Atualiza o save no service
             self.save_service.atualizar_save(self.save_atual)
+            self.jogador_service.avancar_fase_jogador(self.jogador_atual.get_id_jogador())
 
     def mostrar_introducao(self, tela_salva=None):
         id_fase = self.id_fases[self.fase_atual]

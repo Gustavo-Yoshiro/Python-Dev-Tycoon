@@ -37,4 +37,15 @@ class JogadorService(ABC):
     def mudar_fase(self, id_jogador, nova_fase):
         pass
 
+    @abstractmethod
+    def buscar_tipo_fase_atual(self, id_jogador):
+        pass
+
+    @abstractmethod
+    def avancar_fase_jogador(self, id_jogador: int):
+        pass
+
+    @abstractmethod
+    def apagar_jogador(self, id_jogador:int):
+        pass
     # Outros métodos de negócio que quiser!

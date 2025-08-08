@@ -22,3 +22,15 @@ class JogadorPersistencia(ABC):
     @abstractmethod
     def atualizar(self, jogador: Jogador):
         pass
+
+    @abstractmethod
+    def buscar_tipo_fase_atual(self, id_jogador):
+        pass
+
+    @abstractmethod
+    def avancar_fase_jogador(self, id_jogador: int):
+        pass
+
+    @abstractmethod
+    def apagar_jogador(self, id_jogador:int):
+        pass
