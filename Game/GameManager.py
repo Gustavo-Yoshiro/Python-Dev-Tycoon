@@ -120,11 +120,11 @@ class GameManager:
 
             # Atualiza tempo e data
             self.save_atual.set_tempo_jogo(tempo_de_jogo)
-            self.save_atual.set_data_modificacao(data_atual)
+            self.save_atual.set_data_save(data_atual)
 
-            # Atualiza o save no serviço
+            # Atualiza o save no service
             self.save_service.atualizar_save(self.save_atual)
-
+            self.jogador_service.avancar_fase_jogador(self.jogador_atual.get_id_jogador())
 
     def mostrar_introducao(self, tela_salva=None):
         id_fase = self.id_fases[self.fase_atual]

@@ -124,13 +124,13 @@ class TelaSave:
         texto_fase = self.fonte_normal.render(texto_fase_str, True, (255, 255, 255))
         tela.blit(texto_fase, (slot.x + 145, slot.y + 50))
 
-        # Data do save (formatada sem segundos)
         try:
-            data_obj = datetime.strptime(save.get_data_save(), "%Y-%m-%d %H:%M:%S.%f")
+            data_obj = datetime.strptime(save.get_data_save(), "%Y-%m-%d %H:%M:%S")
             data_formatada = data_obj.strftime("%d/%m/%Y %H:%M")
         except Exception as e:
             print("Erro ao formatar data:", e)
             data_formatada = save.get_data_save()
+
 
         texto_data = self.fonte_pequena.render(
             data_formatada, True, (100, 100, 100)
