@@ -10,20 +10,19 @@ class TelaIntroducaoTopico:
         self.on_confirmar = on_confirmar
         self.jogador = jogador
         self.nome_jogador = jogador.get_nome() if jogador else "Visitante"
-        self.painel_visivel = True  # Para fechar a tela
+        self.painel_visivel = True
 
         # Arrastar painel
         self.dragging = False
         self.drag_offset = (0, 0)
 
         pygame.font.init()
-        self.fonte_titulo = pygame.font.SysFont('Consolas', 28, bold=True)
-        self.fonte = pygame.font.SysFont('Consolas', 22)
-        self.fonte_pequena = pygame.font.SysFont('Consolas', 20)
-
-        #caminho_img = os.path.join("Assets", "TelaJogoIniciante.png")
-        #self.bg = pygame.image.load(caminho_img).convert_alpha()
-        #self.bg = pygame.transform.smoothscale(self.bg, (largura, altura))
+        self.font_size_titulo = 28
+        self.font_size = 22
+        self.font_size_pequena = 20
+        self.fonte_titulo = pygame.font.SysFont('Consolas', self.font_size_titulo, bold=True)
+        self.fonte = pygame.font.SysFont('Consolas', self.font_size)
+        self.fonte_pequena = pygame.font.SysFont('Consolas', self.font_size_pequena)
 
         # Painel central
         self.rect_painel = pygame.Rect(
@@ -59,8 +58,25 @@ class TelaIntroducaoTopico:
                 linhas.append(atual)
         return linhas
 
+    def ajustar_fonte_para_caber(self, texto, fonte_base, largura_max, altura_max, min_font=14):
+        # Tenta reduzir a fonte até caber no painel
+        font_size = fonte_base.get_height()
+        fonte = fonte_base
+        while font_size >= min_font:
+            linhas = self.quebrar_linha(texto, fonte, largura_max)
+            total_h = len(linhas) * (fonte.get_height() + 4)
+            if total_h <= altura_max:
+                return fonte, linhas
+            font_size -= 1
+            fonte = pygame.font.SysFont('Consolas', font_size)
+        # Se não couber de jeito nenhum, retorna no mínimo e corta linhas
+        linhas = self.quebrar_linha(texto, fonte, largura_max)
+        max_linhas = max(1, altura_max // (fonte.get_height() + 4))
+        if len(linhas) > max_linhas:
+            linhas = linhas[:max_linhas-1] + ["..."]
+        return fonte, linhas
+
     def desenhar(self, tela):
-        #tela.blit(self.bg, (0, 0))
         if not self.painel_visivel:
             return
 
@@ -70,13 +86,13 @@ class TelaIntroducaoTopico:
         tela.blit(painel_surf, (painel.x, painel.y))
         pygame.draw.rect(tela, (42, 103, 188), painel, 6, border_radius=16)
 
-        # --- DESENHE A BARRA AZUL PRIMEIRO ---
+        # --- Barra azul do topo ---
         header_h = 50
         header_rect = pygame.Rect(painel.x, painel.y, painel.w, header_h)
         pygame.draw.rect(tela, (28, 44, 80), header_rect, border_radius=14)
         pygame.draw.line(tela, (60, 160, 255), (painel.x, painel.y + header_h), (painel.x + painel.w, painel.y + header_h), 2)
 
-        # Botão X POR CIMA do header
+        # Botão X no header
         tam = 32
         espaco = 10
         self.rect_x = pygame.Rect(
@@ -122,10 +138,13 @@ class TelaIntroducaoTopico:
         y = divisoria_y + 12
 
         largura_max = painel.w - 2 * margem_x
-        linhas = self.quebrar_linha(self.descricao, self.fonte_pequena, largura_max)
+        altura_max = self.rect_btn.y - y
+
+        # Ajusta fonte automaticamente para caber tudo
+        fonte_otimizada, linhas = self.ajustar_fonte_para_caber(self.descricao, self.fonte_pequena, largura_max, altura_max)
         for linha in linhas:
-            tela.blit(self.fonte_pequena.render(linha, True, (255,255,255)), (x, y))
-            y += 32
+            tela.blit(fonte_otimizada.render(linha, True, (255,255,255)), (x, y))
+            y += fonte_otimizada.get_height() + 4
 
         # Botão "ENTENDIDO"
         mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -152,11 +171,9 @@ class TelaIntroducaoTopico:
         for evento in eventos:
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 x, y = evento.pos
-                # Clique no X para fechar o painel
                 if hasattr(self, "rect_x") and self.rect_x.collidepoint(x, y):
                     self.painel_visivel = False
-                    return  # só fecha!
-                # Arrastar painel
+                    return
                 if evento.button == 1:
                     header_h = 50
                     header_rect = pygame.Rect(self.rect_painel.x, self.rect_painel.y, self.rect_painel.w, header_h)
@@ -175,10 +192,9 @@ class TelaIntroducaoTopico:
             elif evento.type == pygame.MOUSEBUTTONUP:
                 if evento.button == 1 and self.dragging:
                     self.dragging = False
-
-            # Clique no botão "ENTENDIDO"
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 x, y = evento.pos
                 if self.rect_btn.collidepoint(x, y):
                     if self.on_confirmar:
                         self.on_confirmar()
+                        #funcio

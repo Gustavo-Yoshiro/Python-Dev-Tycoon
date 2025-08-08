@@ -24,8 +24,6 @@ class TelaExercicio:
 
         self.dragging = False
         self.drag_offset = (0, 0)
-
-        #self.centralizar_prompt()
         
         # Serviços
         self.exercicio_service = ExercicioServiceImpl()
@@ -34,8 +32,6 @@ class TelaExercicio:
         # Carrega exercícios e progresso do jogador nesta fase
         self.exercicios, progresso = self.exercicio_service.carregar_exercicios(self.id_fase, self.jogador)
 
-
-        # Recupera progresso salvo ou inicia do zero
         if progresso:
             self.indice_atual = progresso.get_indice_exercicio()
             self.acertos = progresso.get_acertos()
@@ -45,7 +41,6 @@ class TelaExercicio:
             self.acertos = 0
             self.erros = 0
 
-        # FINALIZADO se já respondeu todos!
         if self.exercicios and self.indice_atual >= len(self.exercicios):
             self.finalizado = True
             self.exercicio_selecionado = None
@@ -53,7 +48,6 @@ class TelaExercicio:
             self.finalizado = False
             self.exercicio_selecionado = self.exercicios[self.indice_atual] if self.exercicios else None
         
-        # Estado da interface/editor
         self.scroll_offset_x = 0
         self.input_ativo = False
         self.input_text = [""]
@@ -67,26 +61,18 @@ class TelaExercicio:
         self.blocos_disponiveis = []
         self.blocos_resposta = []
         
-        # Gráficos/UI
         pygame.font.init()
         self.fonte = pygame.font.SysFont('Consolas', 24)
         self.fonte_pequena = pygame.font.SysFont('Consolas', 18)
         self.fonte_editor = pygame.font.SysFont('Consolas', 20)
-        self.editor_lh = self.fonte_editor.get_height()  # <-- Só aqui!
-        
+        self.editor_lh = self.fonte_editor.get_height()
         
         self.rect_livro = pygame.Rect(int(largura * 0.85), int(altura * 0.12), 48, 48)
         self.img_ajuda = pygame.image.load(os.path.join("Assets", "ajuda.png")).convert_alpha()
         self.img_ajuda = pygame.transform.smoothscale(self.img_ajuda, (self.rect_livro.width, self.rect_livro.height))
-        
-        #caminho_img = os.path.join("Assets", "TelaJogoIniciante.png")
-        #self.bg = pygame.image.load(caminho_img).convert_alpha()
-        #self.bg = pygame.transform.smoothscale(self.bg, (largura, altura))
 
-        # Prompt
         self.prompt_visivel = True
         self.prompt_msg = ""
-        # Centralizado e responsivo
         self.rect_prompt = pygame.Rect(
             int(largura * 0.25),
             int(altura * 0.13),
@@ -112,12 +98,30 @@ class TelaExercicio:
         for palavra in palavras:
             teste = linha + palavra + ' '
             if fonte.size(teste)[0] > largura_max:
-                linhas.append(linha)
+                linhas.append(linha.strip())
                 linha = palavra + ' '
             else:
                 linha = teste
-        linhas.append(linha)
+        if linha.strip():
+            linhas.append(linha.strip())
         return linhas
+
+    @staticmethod
+    def ajustar_fonte_para_caber(texto, fonte_base, largura_max, altura_max, min_font=13, espacamento=4):
+        font_size = fonte_base.get_height()
+        fonte = fonte_base
+        while font_size >= min_font:
+            linhas = TelaExercicio.quebrar_texto(texto, fonte, largura_max)
+            total_h = len(linhas) * (fonte.get_height() + espacamento)
+            if total_h <= altura_max:
+                return fonte, linhas
+            font_size -= 1
+            fonte = pygame.font.SysFont('Consolas', font_size)
+        linhas = TelaExercicio.quebrar_texto(texto, fonte, largura_max)
+        max_linhas = max(1, altura_max // (fonte.get_height() + espacamento))
+        if len(linhas) > max_linhas:
+            linhas = linhas[:max_linhas-1] + ["..."]
+        return fonte, linhas
 
     def centralizar_prompt(self):
         self.rect_prompt.x = int(self.largura * 0.25)
@@ -127,13 +131,8 @@ class TelaExercicio:
         return "\n".join(self.input_text).rstrip()
 
     def desenhar(self, tela):
-        
-        #tela.blit(self.bg, (0, 0))
-
 
         if not self.prompt_visivel:
-            # Exemplo: Prompt fechado, pode exibir outra coisa ou só o fundo
-            #tela.blit(self.fonte.render("Prompt fechado!", True, (220,80,80)), (self.largura//2-160, self.altura//2))
             return
 
         prompt = self.rect_prompt
@@ -151,7 +150,7 @@ class TelaExercicio:
         # Título
         txt = self.fonte.render(self.nome_topico, True, (230, 240, 255))
         tela.blit(txt, (prompt.x+24, prompt.y+10))
-        # ============ ADICIONE ESSE BLOCO ============
+
         usuario_txt = f"Usuário logado: {self.nome_jogador}"
         usuario_surface = self.fonte_pequena.render(usuario_txt, True, (230, 230, 90))
         tela.blit(usuario_surface, (prompt.x + 28, prompt.y + header_h + 6))
@@ -195,13 +194,10 @@ class TelaExercicio:
             surf.blit(tip, (16,10))
             tela.blit(surf, (mx-largura_balao//2, my-altura_balao-8))
 
-
         # -------- Barras de Progresso --------
         BAR_HEIGHT = 28
-
-        # Ajuste: barra começa após nome do usuário + linha divisória
         usuario_surface = self.fonte_pequena.render(f"Usuário logado: {self.nome_jogador}", True, (230, 230, 90))
-        espaco_usuario = usuario_surface.get_height() + 18  # 18 para espaçamento e linha
+        espaco_usuario = usuario_surface.get_height() + 18
 
         y_barras = prompt.y + header_h + espaco_usuario
 
@@ -210,14 +206,11 @@ class TelaExercicio:
         barra1_perc = self.fases_concluidas / self.total_fases if self.total_fases > 0 else 0
         barra2_perc = (self.indice_atual+1)/len(self.exercicios) if self.exercicios else 0
 
-        # Fundo das barras
         pygame.draw.rect(tela, (46, 48, 80), bar1_rect, border_radius=12)
         pygame.draw.rect(tela, (46, 48, 80), bar2_rect, border_radius=12)
-        # Barras coloridas: laranja/amarelo + ciano/verde-água
         pygame.draw.rect(tela, (255, 204, 72), (bar1_rect.x, bar1_rect.y, int(bar1_rect.w*barra1_perc), bar1_rect.h), border_radius=12)
         pygame.draw.rect(tela, (84, 240, 200), (bar2_rect.x, bar2_rect.y, int(bar2_rect.w*barra2_perc), bar2_rect.h), border_radius=12)
 
-        # Textos centralizados nas barras
         t1 = self.fonte_pequena.render(f"Tópicos: {self.fases_concluidas}/{self.total_fases}", True, (60, 60, 90))
         t2 = self.fonte_pequena.render(f"Questão {self.indice_atual+1}/{len(self.exercicios) if self.exercicios else 1}", True, (40, 130, 110))
         t1_y = bar1_rect.y + (BAR_HEIGHT - t1.get_height()) // 2
@@ -225,9 +218,15 @@ class TelaExercicio:
         tela.blit(t1, (bar1_rect.x+8, t1_y))
         tela.blit(t2, (bar2_rect.x+8, t2_y))
 
-
-        # --- Pergunta
         y = bar2_rect.bottom + 24
+        largura_max = prompt.w - 80
+
+        # Limite vertical para tudo antes do botão
+        btn_w, btn_h = 180, 52
+        btn_x = prompt.x + (prompt.w-btn_w)//2
+        btn_y = prompt.bottom - btn_h - 18
+        altura_total = btn_y - y - 16
+
         if self.finalizado:
             msg = f"Quiz finalizado!"
             placar = f"Acertos: {self.acertos} | Erros: {self.erros} de {len(self.exercicios)}"
@@ -236,17 +235,21 @@ class TelaExercicio:
             return
 
         if self.exercicio_selecionado:
-            # Pergunta/enunciado
-            linhas_pergunta = self.quebrar_texto(self.exercicio_selecionado.get_pergunta(), self.fonte_pequena, prompt.w - 80)
+            # ------- PERGUNTA responsiva
+            fonte_pergunta, linhas_pergunta = self.ajustar_fonte_para_caber(
+                self.exercicio_selecionado.get_pergunta(), self.fonte_pequena, largura_max, altura_total//3
+            )
             for linha in linhas_pergunta:
-                tela.blit(self.fonte_pequena.render(linha, True, (255, 255, 255)), (prompt.x + 40, y))
-                y += 27
-            # Dica
-            linhas_dica = self.quebrar_texto(f"Dica: {self.exercicio_selecionado.get_dicas()}", self.fonte_pequena, prompt.w - 80)
-            for linha in linhas_dica:
-                tela.blit(self.fonte_pequena.render(linha, True, (180, 180, 0)), (prompt.x + 40, y))
-                y += 27
+                tela.blit(fonte_pergunta.render(linha, True, (255, 255, 255)), (prompt.x + 40, y))
+                y += fonte_pergunta.get_height() + 2
 
+            # ------- DICA responsiva
+            fonte_dica, linhas_dica = self.ajustar_fonte_para_caber(
+                f"Dica: {self.exercicio_selecionado.get_dicas()}", self.fonte_pequena, largura_max, altura_total//4
+            )
+            for linha in linhas_dica:
+                tela.blit(fonte_dica.render(linha, True, (180, 180, 0)), (prompt.x + 40, y))
+                y += fonte_dica.get_height() + 2
 
             tipo = self.exercicio_selecionado.get_tipo().lower()
             # ---------- OBJETIVA ----------
@@ -257,8 +260,11 @@ class TelaExercicio:
                 random.shuffle(alternativas)
                 letras = ['A', 'B', 'C', 'D'][:len(alternativas)]
                 self.rect_alternativas = []
+                # Calcule espaço para cada alternativa
+                altura_restante = btn_y - y - 14
+                alt_h = max(30, min(42, altura_restante // max(1,len(alternativas))))
                 for idx, alt in enumerate(alternativas):
-                    rect = pygame.Rect(prompt.x + 40, y, prompt.w - 80, 34)
+                    rect = pygame.Rect(prompt.x + 40, y, prompt.w - 80, alt_h)
                     self.rect_alternativas.append((rect, alt, idx))
                     cor = (200, 200, 50)
                     pygame.draw.rect(tela, cor, rect, 0)
@@ -266,21 +272,25 @@ class TelaExercicio:
                         pygame.draw.rect(tela, (0, 180, 255), rect, 4)
                     else:
                         pygame.draw.rect(tela, (80, 80, 80), rect, 2)
-                    txt = f"{letras[idx]}) {alt}"
-                    tela.blit(self.fonte_pequena.render(txt, True, (0, 0, 0)), (rect.x + 10, rect.y + 6))
-                    y += 42
+                    fonte_alt, linhas_alt = self.ajustar_fonte_para_caber(
+                        f"{letras[idx]}) {alt}", self.fonte_pequena, rect.w-18, alt_h-6
+                    )
+                    y_alt = rect.y + 4
+                    for linha in linhas_alt:
+                        tela.blit(fonte_alt.render(linha, True, (0, 0, 0)), (rect.x + 10, y_alt))
+                        y_alt += fonte_alt.get_height()
+                    y += alt_h + 5
             # ---------- DISSERTATIVA ----------
             elif tipo == "dissertativa":
-                # FIXE o número de linhas visíveis (não varie conforme input_text)
                 linhas = self.linhas_visiveis
+                CAIXA_OFFSET = 40
                 editor_h = linhas * self.fonte_editor.get_height() + 16
-                caixa = pygame.Rect(prompt.x+40, y, prompt.w-80, editor_h)
+                caixa = pygame.Rect(prompt.x+40, y + CAIXA_OFFSET, prompt.w-80, editor_h)
                 pygame.draw.rect(tela, (52, 56, 64), caixa)
                 pygame.draw.rect(tela, (70, 120, 200), caixa, 2)
                 total_linhas = len(self.input_text)
                 linha, coluna = self.cursor_pos
                 largura_caixa = caixa.w - 30
-                # Renderize só as linhas do scroll!
                 for idx in range(self.scroll_offset, min(self.scroll_offset + linhas, total_linhas)):
                     y_linha = caixa.y + (idx - self.scroll_offset) * self.editor_lh + 6
                     linha_num_surface = self.fonte_editor.render(str(idx+1).rjust(2), True, (90, 160, 220))
@@ -315,55 +325,77 @@ class TelaExercicio:
                     random.shuffle(blocos)
                     self.blocos_disponiveis = [(bloco, None) for bloco in blocos]
                     self.blocos_resposta = []
-                tela.blit(self.fonte_pequena.render("Blocos disponíveis:", True, (200,200,255)), (prompt.x + 40, y))
-                bloco_altura = 35
+                # Blocos disponíveis
+                fonte_bloco, linhas_bloco_disp = self.ajustar_fonte_para_caber(
+                    "Blocos disponíveis:", self.fonte_pequena, int(prompt.w*0.48)-18, 30
+                )
+                tela.blit(fonte_bloco.render("Blocos disponíveis:", True, (200,200,255)), (prompt.x + 40, y))
+                bloco_altura = max(28, min(35, (btn_y - y - 60)//max(1,len(self.blocos_disponiveis))))
                 for i, (bloco, _) in enumerate(self.blocos_disponiveis):
                     rect = pygame.Rect(prompt.x + 40, y+30+i*bloco_altura, int(prompt.w*0.48), bloco_altura-5)
                     pygame.draw.rect(tela, (40, 120, 255), rect)
                     pygame.draw.rect(tela, (30, 40, 90), rect, 2)
-                    tela.blit(self.fonte_pequena.render(bloco, True, (255,255,255)), (rect.x+5, rect.y+7))
+                    fonte_b, linhas_b = self.ajustar_fonte_para_caber(
+                        bloco, self.fonte_pequena, rect.w-12, bloco_altura-9
+                    )
+                    y_b = rect.y + 5
+                    for l_b in linhas_b:
+                        tela.blit(fonte_b.render(l_b, True, (255,255,255)), (rect.x+5, y_b))
+                        y_b += fonte_b.get_height()
                     self.blocos_disponiveis[i] = (bloco, rect)
-                tela.blit(self.fonte_pequena.render("Sua resposta:", True, (120,255,120)), (prompt.x + int(prompt.w*0.55), y))
+                # Blocos resposta
+                fonte_bloco2, linhas_bloco2 = self.ajustar_fonte_para_caber(
+                    "Sua resposta:", self.fonte_pequena, int(prompt.w*0.43)-16, 30
+                )
+                tela.blit(fonte_bloco2.render("Sua resposta:", True, (120,255,120)), (prompt.x + int(prompt.w*0.55), y))
                 for i, (bloco, _) in enumerate(self.blocos_resposta):
                     rect = pygame.Rect(prompt.x + int(prompt.w*0.55), y+30+i*bloco_altura, int(prompt.w*0.43), bloco_altura-5)
                     pygame.draw.rect(tela, (80, 210, 80), rect)
                     pygame.draw.rect(tela, (30, 60, 30), rect, 2)
-                    tela.blit(self.fonte_pequena.render(bloco, True, (255,255,255)), (rect.x+5, rect.y+7))
+                    fonte_b, linhas_b = self.ajustar_fonte_para_caber(
+                        bloco, self.fonte_pequena, rect.w-12, bloco_altura-9
+                    )
+                    y_b = rect.y + 5
+                    for l_b in linhas_b:
+                        tela.blit(fonte_b.render(l_b, True, (255,255,255)), (rect.x+5, y_b))
+                        y_b += fonte_b.get_height()
                     self.blocos_resposta[i] = (bloco, rect)
                 y += 30 + max(len(self.blocos_disponiveis), len(self.blocos_resposta)) * bloco_altura
 
-            # --- Botão ENVIAR/CONTINUAR arredondado
-            btn_w, btn_h = 180, 52
-            btn_x = prompt.x + (prompt.w-btn_w)//2
-            btn_y = prompt.bottom - btn_h - 18
+            # --- Botão ENVIAR/CONTINUAR
             self.rect_btn = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
             cor_btn = (0, 180, 80) if not self.feedback_ativo and self.pode_enviar() else (0, 150, 200) if self.feedback_ativo else (80, 80, 80)
             pygame.draw.rect(tela, cor_btn, self.rect_btn, border_radius=24)
             label_btn = "ENVIAR" if not self.feedback_ativo else "CONTINUAR"
-            label_surface = self.fonte_pequena.render(label_btn, True, (255,255,255))
-            label_rect = label_surface.get_rect(center=self.rect_btn.center)
-            tela.blit(label_surface, label_rect)
+            fonte_btn, linhas_btn = self.ajustar_fonte_para_caber(label_btn, self.fonte_pequena, btn_w-10, btn_h-10)
+            y_btn = self.rect_btn.y + (btn_h - sum(fonte_btn.get_height() for _ in linhas_btn)) // 2
+            for l_btn in linhas_btn:
+                tela.blit(fonte_btn.render(l_btn, True, (255,255,255)), (self.rect_btn.x + (btn_w - fonte_btn.size(l_btn)[0]) // 2, y_btn))
+                y_btn += fonte_btn.get_height()
 
-            # --- Feedback padronizado abaixo do botão
+            # --- Feedback
             if self.resultado:
                 cor = (0, 255, 0) if "Correta" in self.resultado else (255, 0, 0)
                 feedback_x = self.rect_btn.right + 30
                 feedback_y = self.rect_btn.y + self.rect_btn.height // 2 - self.fonte_pequena.get_height() // 2 - 8
                 msg_curta = "Resposta Correta!" if "Correta" in self.resultado else "Resposta Incorreta!"
-                feedback_surface = self.fonte_pequena.render(msg_curta, True, cor)
-                tela.blit(feedback_surface, (feedback_x, feedback_y))
+                fonte_fb, linhas_fb = self.ajustar_fonte_para_caber(
+                    msg_curta, self.fonte_pequena, 220, self.rect_btn.h-2
+                )
+                y_fb = feedback_y
+                for l_fb in linhas_fb:
+                    tela.blit(fonte_fb.render(l_fb, True, cor), (feedback_x, y_fb))
+                    y_fb += fonte_fb.get_height()
                 if "Saída:" in self.resultado:
-                    # CALCULE a largura do texto e posicione depois dele
-                    icon_x = feedback_x + feedback_surface.get_width() + 18  # 18 pixels de espaço
+                    icon_x = feedback_x + sum(fonte_fb.size(l)[0] for l in linhas_fb) + 18
                     icon_rect = pygame.Rect(icon_x, feedback_y, 24, 24)
                     pygame.draw.circle(tela, (100, 180, 255), icon_rect.center, 12)
                     i_mark = self.fonte_pequena.render("i", True, (30, 50, 80))
                     tela.blit(i_mark, (icon_rect.x + 6, icon_rect.y + 2))
-                    self.rect_info_saida = icon_rect  # Salva para tratar clique
+                    self.rect_info_saida = icon_rect
                 else:
                     self.rect_info_saida = None
 
-                # Tooltip do ícone "i"
                 if self.rect_info_saida and self.rect_info_saida.collidepoint(pygame.mouse.get_pos()):
                     texto_ajuda = "Ver saída do seu código"
                     largura_balao = self.fonte_pequena.size(texto_ajuda)[0] + 24
@@ -376,13 +408,6 @@ class TelaExercicio:
                     surf.blit(tip, (12,8))
                     tela.blit(surf, (mx-largura_balao//2, my-altura_balao-6))
 
-
-
-
-
-        # Livro/ajuda
-        #tela.blit(self.img_ajuda, (self.rect_livro.x, self.rect_livro.y))
-        # --- DEPOIS DE TUDO: desenha popup SE ativo (sempre por cima) ---
         if self.popup_saida:
             largura, altura = 520, 350
             popup_x = self.largura // 2 - largura // 2
@@ -392,20 +417,17 @@ class TelaExercicio:
             pygame.draw.rect(surf, (120,180,255), (0,0,largura,altura), 3, border_radius=20)
             surf.blit(self.fonte.render("Saída do seu código:", True, (230,230,90)), (20, 20))
 
-            # CORRIGE problema do \r, \n, \t etc
             saida = self.resultado.split("Saída:",1)[-1].replace("\r\n","\n").replace("\r","\n").replace("\t", "    ").strip()
-            # Evita bugs de codificação: força apenas caracteres imprimíveis
             saida = ''.join(c if c.isprintable() or c in "\n" else '?' for c in saida)
             linhas = []
             for linha in saida.split("\n"):
                 linhas += self.quebrar_texto(linha, self.fonte_pequena, largura-40)
             y_popup = 65
-            for linha in linhas[:12]:  # Até 12 linhas
+            for linha in linhas[:12]:
                 surf.blit(self.fonte_pequena.render(linha, True, (230,230,230)), (18, y_popup))
                 y_popup += 24
             if len(linhas) > 12:
                 surf.blit(self.fonte_pequena.render("[...]", True, (220,180,180)), (18, y_popup))
-            # Botão fechar
             btn_rect = pygame.Rect(largura-90, altura-46, 76, 34)
             pygame.draw.rect(surf, (255, 90, 90), btn_rect, border_radius=12)
             fechar_label = self.fonte_pequena.render("FECHAR", True, (255,255,255))
@@ -414,6 +436,13 @@ class TelaExercicio:
             self._popup_btn_rect = pygame.Rect(popup_x+btn_rect.x, popup_y+btn_rect.y, btn_rect.w, btn_rect.h)
         else:
             self._popup_btn_rect = None
+
+    # ... restante da classe (pode manter igual ao seu original para eventos, pode_enviar, etc) ...
+    # Só foi trocado o método desenhar e incluída a função ajustar_fonte_para_caber.
+
+    # Mantenha o resto do seu código igual!
+
+
 
     def pode_enviar(self):
         if not self.exercicio_selecionado:
