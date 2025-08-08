@@ -16,3 +16,7 @@ class ExercicioService(ABC):
     def obter_dicas(self, id_exercicio: int) -> str:
         """Retorna a dica associada ao exercício."""
         pass
+
+    @abstractmethod
+    def validar_codigo_ast_por_topico(self, codigo, id_fase):
+        pass

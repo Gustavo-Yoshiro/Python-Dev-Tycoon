@@ -177,7 +177,8 @@ class GameManager:
             callback_avancar=self.avancar_fase,
             callback_reiniciar=self.reiniciar_exercicio,
             #callback_voltar=self.voltar_para_save,
-            acertou_minimo=acertou_minimo
+            acertou_minimo=acertou_minimo,
+            jogador=self.jogador_atual
         )
         
         if acertou_minimo:

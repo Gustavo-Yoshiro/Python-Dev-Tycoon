@@ -18,10 +18,6 @@ class TelaExercicio:
         self.id_fase = id_fase
         self.nome_jogador = jogador.get_nome() if jogador else ""
 
-        self.popup_saida = False
-        self._popup_btn_rect = None
-        self.rect_info_saida = None
-
         self.dragging = False
         self.drag_offset = (0, 0)
 
@@ -79,9 +75,9 @@ class TelaExercicio:
         self.img_ajuda = pygame.image.load(os.path.join("Assets", "ajuda.png")).convert_alpha()
         self.img_ajuda = pygame.transform.smoothscale(self.img_ajuda, (self.rect_livro.width, self.rect_livro.height))
         
-        #caminho_img = os.path.join("Assets", "TelaJogoIniciante.png")
-        #self.bg = pygame.image.load(caminho_img).convert_alpha()
-        #self.bg = pygame.transform.smoothscale(self.bg, (largura, altura))
+        caminho_img = os.path.join("Assets", "TelaJogoIniciante.png")
+        self.bg = pygame.image.load(caminho_img).convert_alpha()
+        self.bg = pygame.transform.smoothscale(self.bg, (largura, altura))
 
         # Prompt
         self.prompt_visivel = True
@@ -127,9 +123,9 @@ class TelaExercicio:
         return "\n".join(self.input_text).rstrip()
 
     def desenhar(self, tela):
-        
-        #tela.blit(self.bg, (0, 0))
-
+        #print("ANTES DE DESENHAR:", self.rect_prompt.x, self.rect_prompt.y)
+        tela.blit(self.bg, (0, 0))
+        #tela.blit(self.fonte_pequena.render(f"Usuário: {self.nome_jogador}", True, (255, 220, 120)), (20, 20))
 
         if not self.prompt_visivel:
             # Exemplo: Prompt fechado, pode exibir outra coisa ou só o fundo
@@ -151,18 +147,6 @@ class TelaExercicio:
         # Título
         txt = self.fonte.render(self.nome_topico, True, (230, 240, 255))
         tela.blit(txt, (prompt.x+24, prompt.y+10))
-        # ============ ADICIONE ESSE BLOCO ============
-        usuario_txt = f"Usuário logado: {self.nome_jogador}"
-        usuario_surface = self.fonte_pequena.render(usuario_txt, True, (230, 230, 90))
-        tela.blit(usuario_surface, (prompt.x + 28, prompt.y + header_h + 6))
-        y_usuario = prompt.y + header_h + 6 + usuario_surface.get_height() + 4
-        pygame.draw.line(
-            tela,
-            (80, 120, 180),
-            (prompt.x + 28, y_usuario),
-            (prompt.x + prompt.w - 28, y_usuario),
-            2
-        )
         # ? e X
         self.rect_q = pygame.Rect(prompt.right-90, prompt.y+10, 30, 30)
         self.rect_x = pygame.Rect(prompt.right-45, prompt.y+10, 30, 30)
@@ -198,15 +182,8 @@ class TelaExercicio:
 
         # -------- Barras de Progresso --------
         BAR_HEIGHT = 28
-
-        # Ajuste: barra começa após nome do usuário + linha divisória
-        usuario_surface = self.fonte_pequena.render(f"Usuário logado: {self.nome_jogador}", True, (230, 230, 90))
-        espaco_usuario = usuario_surface.get_height() + 18  # 18 para espaçamento e linha
-
-        y_barras = prompt.y + header_h + espaco_usuario
-
-        bar1_rect = pygame.Rect(prompt.x+40, y_barras, prompt.w-80, BAR_HEIGHT)
-        bar2_rect = pygame.Rect(prompt.x+40, y_barras+42, prompt.w-80, BAR_HEIGHT)
+        bar1_rect = pygame.Rect(prompt.x+40, prompt.y+header_h+18, prompt.w-80, BAR_HEIGHT)
+        bar2_rect = pygame.Rect(prompt.x+40, prompt.y+header_h+60, prompt.w-80, BAR_HEIGHT)
         barra1_perc = self.fases_concluidas / self.total_fases if self.total_fases > 0 else 0
         barra2_perc = (self.indice_atual+1)/len(self.exercicios) if self.exercicios else 0
 
@@ -348,72 +325,11 @@ class TelaExercicio:
             if self.resultado:
                 cor = (0, 255, 0) if "Correta" in self.resultado else (255, 0, 0)
                 feedback_x = self.rect_btn.right + 30
-                feedback_y = self.rect_btn.y + self.rect_btn.height // 2 - self.fonte_pequena.get_height() // 2 - 8
-                msg_curta = "Resposta Correta!" if "Correta" in self.resultado else "Resposta Incorreta!"
-                feedback_surface = self.fonte_pequena.render(msg_curta, True, cor)
-                tela.blit(feedback_surface, (feedback_x, feedback_y))
-                if "Saída:" in self.resultado:
-                    # CALCULE a largura do texto e posicione depois dele
-                    icon_x = feedback_x + feedback_surface.get_width() + 18  # 18 pixels de espaço
-                    icon_rect = pygame.Rect(icon_x, feedback_y, 24, 24)
-                    pygame.draw.circle(tela, (100, 180, 255), icon_rect.center, 12)
-                    i_mark = self.fonte_pequena.render("i", True, (30, 50, 80))
-                    tela.blit(i_mark, (icon_rect.x + 6, icon_rect.y + 2))
-                    self.rect_info_saida = icon_rect  # Salva para tratar clique
-                else:
-                    self.rect_info_saida = None
-
-                # Tooltip do ícone "i"
-                if self.rect_info_saida and self.rect_info_saida.collidepoint(pygame.mouse.get_pos()):
-                    texto_ajuda = "Ver saída do seu código"
-                    largura_balao = self.fonte_pequena.size(texto_ajuda)[0] + 24
-                    altura_balao = 32
-                    mx, my = pygame.mouse.get_pos()
-                    surf = pygame.Surface((largura_balao, altura_balao), pygame.SRCALPHA)
-                    pygame.draw.rect(surf, (40,60,110, 220), (0,0,largura_balao,altura_balao), border_radius=8)
-                    pygame.draw.rect(surf, (110,190,255), (0,0,largura_balao,altura_balao), 2, border_radius=8)
-                    tip = self.fonte_pequena.render(texto_ajuda, True, (255,255,255))
-                    surf.blit(tip, (12,8))
-                    tela.blit(surf, (mx-largura_balao//2, my-altura_balao-6))
-
-
-
-
+                feedback_y = self.rect_btn.y + self.rect_btn.height // 2 - self.fonte.get_height() // 2 - 8
+                tela.blit(self.fonte.render(self.resultado, True, cor), (feedback_x, feedback_y))
 
         # Livro/ajuda
         #tela.blit(self.img_ajuda, (self.rect_livro.x, self.rect_livro.y))
-        # --- DEPOIS DE TUDO: desenha popup SE ativo (sempre por cima) ---
-        if self.popup_saida:
-            largura, altura = 520, 350
-            popup_x = self.largura // 2 - largura // 2
-            popup_y = self.altura // 2 - altura // 2
-            surf = pygame.Surface((largura, altura), pygame.SRCALPHA)
-            pygame.draw.rect(surf, (30, 44, 70, 232), (0,0,largura,altura), border_radius=20)
-            pygame.draw.rect(surf, (120,180,255), (0,0,largura,altura), 3, border_radius=20)
-            surf.blit(self.fonte.render("Saída do seu código:", True, (230,230,90)), (20, 20))
-
-            # CORRIGE problema do \r, \n, \t etc
-            saida = self.resultado.split("Saída:",1)[-1].replace("\r\n","\n").replace("\r","\n").replace("\t", "    ").strip()
-            # Evita bugs de codificação: força apenas caracteres imprimíveis
-            saida = ''.join(c if c.isprintable() or c in "\n" else '?' for c in saida)
-            linhas = []
-            for linha in saida.split("\n"):
-                linhas += self.quebrar_texto(linha, self.fonte_pequena, largura-40)
-            y_popup = 65
-            for linha in linhas[:12]:  # Até 12 linhas
-                surf.blit(self.fonte_pequena.render(linha, True, (230,230,230)), (18, y_popup))
-                y_popup += 24
-            if len(linhas) > 12:
-                surf.blit(self.fonte_pequena.render("[...]", True, (220,180,180)), (18, y_popup))
-            # Botão fechar
-            btn_rect = pygame.Rect(largura-90, altura-46, 76, 34)
-            pygame.draw.rect(surf, (255, 90, 90), btn_rect, border_radius=12)
-            fechar_label = self.fonte_pequena.render("FECHAR", True, (255,255,255))
-            surf.blit(fechar_label, (btn_rect.x+10, btn_rect.y+5))
-            tela.blit(surf, (popup_x, popup_y))
-            self._popup_btn_rect = pygame.Rect(popup_x+btn_rect.x, popup_y+btn_rect.y, btn_rect.w, btn_rect.h)
-        else:
-            self._popup_btn_rect = None
 
     def pode_enviar(self):
         if not self.exercicio_selecionado:
@@ -447,26 +363,15 @@ class TelaExercicio:
 
 
     def tratar_eventos(self, eventos):
-        if not self.prompt_visivel:
-            return
-        # --- TRAVA TUDO enquanto popup ativo ---
-        if self.popup_saida:
+        """
+        if hasattr(self, 'mouse_down_ao_entrar') and self.mouse_down_ao_entrar:
             for evento in eventos:
-                if self._popup_btn_rect and evento.type == pygame.MOUSEBUTTONDOWN:
-                    if self._popup_btn_rect.collidepoint(evento.pos):
-                        self.popup_saida = False
-            return  # NÃO processa mais nada se popup ativo
-        
-        for evento in eventos:
-            if hasattr(self, "rect_info_saida") and self.rect_info_saida:
-                if evento.type == pygame.MOUSEBUTTONDOWN:
-                    if self.rect_info_saida.collidepoint(evento.pos):
-                        self.popup_saida = True  # Ativa o popup
-            if hasattr(self, "_popup_btn_rect") and self._popup_btn_rect:
-                if evento.type == pygame.MOUSEBUTTONDOWN:
-                    if self._popup_btn_rect.collidepoint(evento.pos):
-                        self.popup_saida = False
+                if evento.type == pygame.MOUSEBUTTONUP:
+                    self.mouse_down_ao_entrar = False  # Libera eventos normalmente depois de soltar
+            return
+        """
 
+        for evento in eventos:
             # Início do drag
             if self.prompt_visivel and evento.type == pygame.MOUSEBUTTONDOWN:
                 if evento.button == 1:  # Botão esquerdo
@@ -514,20 +419,8 @@ class TelaExercicio:
             if tipo == "dissertativa":
                 if evento.type == pygame.MOUSEBUTTONDOWN:
                     x, y = evento.pos
-                    # Calcule o mesmo y que está no desenhar
-                    header_h = 50
-                    usuario_surface = self.fonte_pequena.render(f"Usuário logado: {self.nome_jogador}", True, (230, 230, 90))
-                    y_usuario = self.rect_prompt.y + header_h + 6 + usuario_surface.get_height() + 4
-                    y_barras = y_usuario + 10  # +10 igual ao desenhar
-
-                    BAR_HEIGHT = 28
-                    bar2_rect_y = y_barras + 42  # segunda barra
-                    bar2_rect_h = BAR_HEIGHT
-
-                    y = bar2_rect_y + bar2_rect_h + 24  # igual desenhar
-
-                    caixa = pygame.Rect(self.rect_prompt.x+40, y, self.rect_prompt.w-80, max(len(self.input_text),5)*self.fonte_editor.get_height()+16)
-
+                    # Editor dentro do prompt
+                    caixa = pygame.Rect(self.rect_prompt.x+40, self.rect_prompt.y+180, self.rect_prompt.w-80, max(len(self.input_text),5)*self.fonte_editor.get_height()+16)
                     if caixa.collidepoint(x, y) and not self.feedback_ativo:
                         self.input_ativo = True
                         linha_clicada = (y - caixa.y) // self.fonte_editor.get_height() + self.scroll_offset
@@ -645,14 +538,13 @@ class TelaExercicio:
                             self.finalizado = True
 
     @staticmethod
-    def executar_codigo_piston(codigo, versao="3.10.0",entrada_teste=""):
-        
+    def executar_codigo_piston(codigo, versao="3.10.0"):
         url = "https://emkc.org/api/v2/piston/execute"
         payload = {
             "language": "python",
             "version": versao,
             "files": [{"name": "main.py", "content": codigo}],
-            "stdin": entrada_teste if entrada_teste else "",
+            "stdin": "",
             "args": [],
         }
         try:
@@ -669,9 +561,7 @@ class TelaExercicio:
                 return "[SEM OUTPUT]"
         except Exception as e:
             return f"Erro: {e}"
-    def normaliza_saida(saida):
-        return ' '.join(saida.strip().split())
-    
+
     def verificar_resposta(self):
         if not self.exercicio_selecionado:
             return False
@@ -693,21 +583,12 @@ class TelaExercicio:
             return correta
         elif tipo == "dissertativa":
             codigo_usuario = self.get_codigo_usuario()
-            entrada_teste = self.exercicio_selecionado.get_entrada_teste() or ""
-            
-
-            saida_usuario = self.executar_codigo_piston(codigo_usuario, entrada_teste=entrada_teste)
+            saida_usuario = self.executar_codigo_piston(codigo_usuario)
             resposta_certa = self.exercicio_selecionado.get_resposta_certa().strip()
             if saida_usuario.strip() == resposta_certa:
-                # Só valida o AST se a saída está certa!
-                valido, mensagem = self.exercicio_service.validar_codigo_ast_por_topico(codigo_usuario, self.id_fase)
-
-                if valido:
-                    self.resultado = f"Resposta Correta!\nSaída: {saida_usuario}"
-                    return True
-                else:
-                    self.resultado = f"Resposta Incorreta!\nSaída: {saida_usuario}\n{mensagem}"
-                    return False
+                self.resultado = "Resposta Correta!"
+                return True
             else:
                 self.resultado = f"Resposta Incorreta!\nSaída: {saida_usuario}"
+                return False
         return False

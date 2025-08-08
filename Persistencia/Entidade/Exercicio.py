@@ -1,5 +1,5 @@
 class Exercicio:
-    def __init__(self, id_exercicio, id_fase, dicas, pergunta, tipo, resposta_certa, resposta_erradas):
+    def __init__(self, id_exercicio, id_fase, dicas, pergunta, tipo, resposta_certa, resposta_erradas, entrada_teste=None):
         self.__id_exercicio = id_exercicio
         self.__id_fase = id_fase
         self.__dicas = dicas
@@ -7,7 +7,9 @@ class Exercicio:
         self.__tipo = tipo 
         self.__resposta_certa = resposta_certa
         self.__resposta_erradas = resposta_erradas
+        self.__entrada_teste = entrada_teste  # Novo atributo
 
+    # Getters
     def get_id_exercicio(self):
         return self.__id_exercicio
 
@@ -30,14 +32,13 @@ class Exercicio:
         if isinstance(self.__resposta_erradas, list):
             return self.__resposta_erradas
         elif isinstance(self.__resposta_erradas, str):
-            # Remove aspas e espaços e quebra em lista por virgula
-            #return [x.strip().strip('"').strip("'") for x in self.__resposta_erradas.strip("[]()").split(",")]
-            #por pipe
             return [x.strip() for x in self.__resposta_erradas.strip("[]()").split("|")]
-
         return []
 
+    def get_entrada_teste(self):
+        return self.__entrada_teste
 
+    # Setters
     def set_id_exercicio(self, id_exercicio):
         self.__id_exercicio = id_exercicio
 
@@ -58,3 +59,6 @@ class Exercicio:
 
     def set_resposta_erradas(self, resposta_erradas):
         self.__resposta_erradas = resposta_erradas
+
+    def set_entrada_teste(self, entrada_teste):
+        self.__entrada_teste = entrada_teste

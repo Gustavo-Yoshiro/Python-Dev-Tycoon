@@ -44,6 +44,7 @@ class BancoDeDados:
                                 tipo TEXT NOT NULL CHECK(tipo IN ('objetiva', 'dissertativa','dragdrop')),
                                 resposta_certa TEXT NOT NULL,
                                 resposta_errada TEXT,
+                                entrada_teste TEXT,
                                 FOREIGN KEY (id_fase) REFERENCES fase(id_fase)
                             );
                         """)

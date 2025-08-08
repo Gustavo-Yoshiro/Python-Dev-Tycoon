@@ -52,15 +52,25 @@ exercicios = [
         tipo="objetiva", resposta_certa='nome = input("Digite seu nome: ")',
         resposta_erradas='input(nome)|nome == input()|input("Digite seu nome: ") = nome'),
 
-    Exercicio(id_exercicio=None, id_fase=2,
-        dicas="Peça ao usuário seu nome e imprima: Olá, <nome>. Considere que o usuário digita Ana.",
-        pergunta="Dissertativa: Peça ao usuário seu nome e imprima: Olá, <nome>. Considere que o usuário digita Ana.",
-        tipo="dissertativa", resposta_certa='Olá, Ana', resposta_erradas=None),
+    Exercicio(
+        id_exercicio=None, id_fase=2,
+        dicas="Use input() para ler o nome do usuário e depois imprima Olá, <nome>. Considere que o usuário digita Ana.",
+        pergunta="Dissertativa: Peça ao usuário que digite seu nome usando input() e depois imprima: Olá, <nome>. Considere que o usuário digita Ana. Use input() sem texto dentro dos parênteses.",
+        tipo="dissertativa",
+        resposta_certa='Olá, Ana',
+        resposta_erradas=None,
+        entrada_teste='Ana'
+    ),
 
-    Exercicio(id_exercicio=None, id_fase=2,
-        dicas="Peça a cor favorita e imprima junto da frase. Considere que o usuário digita azul.",
-        pergunta="Dissertativa: Peça a cor favorita do usuário e imprima: Sua cor favorita é <cor>. Considere que o usuário digita azul.",
-        tipo="dissertativa", resposta_certa='Sua cor favorita é azul', resposta_erradas=None),
+    Exercicio(
+        id_exercicio=None, id_fase=2,
+        dicas="Use input() para ler a cor favorita do usuário e depois imprima: Sua cor favorita é <cor>. Considere que o usuário digita azul.",
+        pergunta="Dissertativa: Peça ao usuário que digite sua cor favorita usando input() e imprima: Sua cor favorita é <cor>. Considere que o usuário digita azul. Use input() sem texto dentro dos parênteses.",
+        tipo="dissertativa",
+        resposta_certa='Sua cor favorita é azul',
+        resposta_erradas=None,
+        entrada_teste='azul'
+    ),
 
     Exercicio(id_exercicio=None, id_fase=2,
         dicas="Arraste os blocos para a ordem correta.",
@@ -99,7 +109,6 @@ exercicios = [
         tipo="dissertativa", resposta_certa="azul",
         resposta_erradas=None),
 
-
     Exercicio(id_exercicio=None, id_fase=3,
         dicas="Monte a atribuição correta.",
         pergunta="Drag&Drop: Monte o código para criar a variável nota com valor 8.5.",
@@ -112,7 +121,7 @@ exercicios = [
         tipo="dragdrop", resposta_certa="x = 2|y = 4|print(x + y)",
         resposta_erradas="x == 2|print(x y)|print(2 + 4)"),
 
-    # Fase 4: Operadores
+    # ========================== FASE 4: Operadores ==========================
     Exercicio(id_exercicio=None, id_fase=4,
         dicas="== compara se dois valores são iguais.",
         pergunta="Qual operador verifica igualdade entre dois valores em Python?",
@@ -126,32 +135,33 @@ exercicios = [
         resposta_erradas="=/=|==|<>"),
 
     Exercicio(id_exercicio=None, id_fase=4,
-        dicas="Dica: Primeiro resolve multiplicação/divisão, depois soma/subtração.",
-        pergunta="Qual resultado de 3 + 2 * 2 em Python?",
+        dicas="Primeiro resolve multiplicação/divisão, depois soma/subtração.",
+        pergunta="Qual o resultado de 3 + 2 * 2 em Python?",
         tipo="objetiva", resposta_certa="7",
         resposta_erradas="10|9|12"),
 
     Exercicio(id_exercicio=None, id_fase=4,
-        dicas="Você pode usar int(input()) para receber números do usuário.",
-        pergunta="Some dois números fornecidos pelo usuário e mostre o resultado.\nDigite o código exatamente como esperado.",
-        tipo="dissertativa", resposta_certa='a = int(input())\nb = int(input())\nprint(a + b)',
+        dicas="Use dois input() para receber os números.",
+        pergunta="Dissertativa: Peça dois números ao usuário e imprima a soma deles. Considere que o usuário digita 2 e depois 5. Use input() sem texto dentro dos parênteses.",
+        tipo="dissertativa", resposta_certa='7',
+        resposta_erradas=None,
+        entrada_teste='2\n5'
+    ),
+
+    Exercicio(id_exercicio=None, id_fase=4,
+        dicas="Use parênteses para alterar a ordem das operações.",
+        pergunta="Dissertativa: Escreva um código que imprima o resultado de (5 + 3) * 2.",
+        tipo="dissertativa", resposta_certa='16',
         resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=4,
-        dicas="A ordem dos operadores pode alterar o resultado.",
-        pergunta="Mostre o resultado de (5 + 3) * 2 usando print().",
-        tipo="dissertativa", resposta_certa='print((5 + 3) * 2)',
-        resposta_erradas=None),
-
-    Exercicio(id_exercicio=None, id_fase=4,
-        dicas="Arraste os blocos para montar uma expressão que imprima o dobro do valor digitado pelo usuário.",
-        pergunta="Monte a expressão para imprimir o dobro do número digitado.",
+        dicas="Arraste os blocos para montar o comando correto.",
+        pergunta="Drag&Drop: Monte o código para ler um número e imprimir o dobro desse valor.",
         tipo="dragdrop",
         resposta_certa="n = int(input())|print(n * 2)",
         resposta_erradas="n = input()|print(n ** 2)|print(n + n)"),
 
-
-    # Fase 5: If/Else
+    # ========================== FASE 5: If/Else ==========================
     Exercicio(id_exercicio=None, id_fase=5,
         dicas="Python usa dois-pontos ':' ao final do if.",
         pergunta="Qual destas estruturas é correta?",
@@ -165,33 +175,36 @@ exercicios = [
         resposta_erradas="else|else {}|else then:"),
 
     Exercicio(id_exercicio=None, id_fase=5,
-        dicas="Use if/elif/else para criar múltiplas condições.",
-        pergunta="Peça um número e diga se é positivo, negativo ou zero. Escreva o código exato.",
-        tipo="dissertativa", resposta_certa='n = int(input())\nif n > 0:\n    print("Positivo")\nelif n == 0:\n    print("Zero")\nelse:\n    print("Negativo")',
-        resposta_erradas=None),
+        dicas="Use if, elif e else para testar todos os casos.",
+        pergunta="Dissertativa: Peça um número ao usuário e imprima 'Positivo' se for maior que zero, 'Zero' se for igual a zero ou 'Negativo' se for menor que zero. Considere que o usuário digita -3. Use input() sem texto dentro dos parênteses.",
+        tipo="dissertativa", resposta_certa='Negativo',
+        resposta_erradas=None,
+        entrada_teste='-3'
+    ),
 
     Exercicio(id_exercicio=None, id_fase=5,
-        dicas="Atenção à indentação após if.",
-        pergunta="Como imprime 'Maior de idade' se a variável idade for pelo menos 18?",
-        tipo="dissertativa", resposta_certa='if idade >= 18:\n    print("Maior de idade")',
-        resposta_erradas=None),
+        dicas="Teste se idade é maior ou igual a 18.",
+        pergunta="Dissertativa: Peça a idade do usuário e imprima 'Maior de idade' se for pelo menos 18. Considere que o usuário digita 20. Use input() sem texto dentro dos parênteses.",
+        tipo="dissertativa", resposta_certa='Maior de idade',
+        resposta_erradas=None,
+        entrada_teste='20'
+    ),
 
     Exercicio(id_exercicio=None, id_fase=5,
-        dicas="Arraste para montar um teste de número par.",
-        pergunta="Monte o código que imprime 'Par' se n for par.",
+        dicas="Arraste para montar o teste de número par.",
+        pergunta="Drag&Drop: Monte o código que imprime 'Par' se n for par.",
         tipo="dragdrop",
         resposta_certa="if n % 2 == 0:|    print('Par')",
         resposta_erradas="if n % 2 = 0:|print('Par')|if n % 2:|if n // 2:"),
 
     Exercicio(id_exercicio=None, id_fase=5,
-        dicas="Arraste para montar um teste de número negativo.",
-        pergunta="Arraste para montar o teste: se n < 0, imprimir 'Negativo'",
+        dicas="Arraste para montar o teste de número negativo.",
+        pergunta="Drag&Drop: Monte o código para imprimir 'Negativo' se n for menor que zero.",
         tipo="dragdrop",
         resposta_certa="if n < 0:|    print('Negativo')",
         resposta_erradas="if n > 0:|print('Negativo')|if n == 0:|if n <= 0:"),
 
-
-    # Fase 6: For
+    # ========================== FASE 6: For ==========================
     Exercicio(id_exercicio=None, id_fase=6,
         dicas="range(início, fim) vai até fim-1.",
         pergunta="Qual destas opções imprime os números de 1 a 3?",
@@ -205,35 +218,35 @@ exercicios = [
         resposta_erradas="for i in 5:|for i in range(1,5):|for i = 1 to 5:"),
 
     Exercicio(id_exercicio=None, id_fase=6,
-        dicas="Repita a ação com for e range.",
-        pergunta='Imprima a palavra "Python" cinco vezes usando um laço. Escreva exatamente.',
-        tipo="dissertativa", resposta_certa='for i in range(5):\n    print("Python")',
+        dicas="Use um laço for para resolver.",
+        pergunta="Dissertativa: Usando um laço for, imprima os números de 1 até 5, um em cada linha.",
+        tipo="dissertativa", resposta_certa='1\n2\n3\n4\n5',
         resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=6,
-        dicas="For permite iterar sobre listas também.",
-        pergunta="Imprima todos os elementos da lista numeros = [2, 4, 6]",
-        tipo="dissertativa", resposta_certa='numeros = [2, 4, 6]\nfor n in numeros:\n    print(n)',
+        dicas="Use o for para percorrer todos os itens.",
+        pergunta="Dissertativa: Dada a lista numeros = [2, 4, 6], imprima todos os elementos, um por linha.",
+        tipo="dissertativa", resposta_certa='2\n4\n6',
         resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=6,
-        dicas="Arraste para montar o for que imprime 0 a 2.",
-        pergunta="Monte o for que imprime 0, 1 e 2.",
+        dicas="Arraste para montar o for que imprime 0, 1 e 2.",
+        pergunta="Drag&Drop: Monte o for que imprime 0, 1 e 2.",
         tipo="dragdrop",
         resposta_certa="for i in range(3):|    print(i)",
         resposta_erradas="for i in range(1,4):|print(i)|for n in [0,1,2]:"),
 
     Exercicio(id_exercicio=None, id_fase=6,
         dicas="Arraste para montar um for sobre uma lista chamada nomes.",
-        pergunta="Monte o for para imprimir todos os nomes.",
+        pergunta="Drag&Drop: Monte o for para imprimir todos os nomes da lista nomes.",
         tipo="dragdrop",
         resposta_certa="for nome in nomes:|    print(nome)",
         resposta_erradas="for nome in range(nomes):|print(nome)|for n in nomes:"),
 
-    # Fase 7: While
+    # ========================== FASE 7: While ==========================
     Exercicio(id_exercicio=None, id_fase=7,
         dicas="Observe o incremento para evitar loop infinito.",
-        pergunta="O que faz este código?\n\nx = 1\nwhile x <= 3:\n    print(x)\n    x += 1",
+        pergunta="O que faz este código? x = 1 while x <= 3: print(x) x += 1",
         tipo="objetiva", resposta_certa="Imprime 1, 2 e 3",
         resposta_erradas="Não faz nada|Imprime infinitamente|Erro de sintaxe"),
 
@@ -244,33 +257,34 @@ exercicios = [
         resposta_erradas="stop|end|exit"),
 
     Exercicio(id_exercicio=None, id_fase=7,
-        dicas="Repita enquanto a entrada for diferente de zero.",
-        pergunta="Peça ao usuário números até ele digitar 0 e some todos.\nDigite o código exato.",
-        tipo="dissertativa", resposta_certa='total = 0\nn = int(input())\nwhile n != 0:\n    total += n\n    n = int(input())\nprint(total)',
-        resposta_erradas=None),
+        dicas="Repita até digitar 0.",
+        pergunta="Dissertativa: Peça números ao usuário até ele digitar 0 e mostre a soma total. Considere que o usuário digita 5, depois 3 e depois 0. Use input() sem texto dentro dos parênteses.",
+        tipo="dissertativa", resposta_certa='8',
+        resposta_erradas=None,
+        entrada_teste='5\n3\n0'
+    ),
 
     Exercicio(id_exercicio=None, id_fase=7,
-        dicas="While pode ser usado para contagem crescente.",
-        pergunta="Imprima os números de 1 a 5 usando while.",
-        tipo="dissertativa", resposta_certa='x = 1\nwhile x <= 5:\n    print(x)\n    x += 1',
+        dicas="Faça um contador crescente.",
+        pergunta="Dissertativa: Usando while, imprima os números de 1 até 5, um em cada linha.",
+        tipo="dissertativa", resposta_certa='1\n2\n3\n4\n5',
         resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=7,
         dicas="Arraste para montar o laço que imprime de 0 a 2.",
-        pergunta="Monte um while que imprime 0, 1 e 2.",
+        pergunta="Drag&Drop: Monte um while que imprime 0, 1 e 2.",
         tipo="dragdrop",
         resposta_certa="x = 0\nwhile x < 3:|    print(x)|    x += 1",
         resposta_erradas="x = 1|while x <= 3:|print(x)|x = x + 1"),
 
     Exercicio(id_exercicio=None, id_fase=7,
-        dicas="Arraste para montar um laço que para quando encontra um valor negativo.",
-        pergunta="Monte o código: peça números até digitar negativo, e some todos os positivos.",
+        dicas="Arraste para montar um laço que soma positivos até um negativo.",
+        pergunta="Drag&Drop: Monte o código: peça números até digitar um negativo, e some todos os positivos. Considere que o usuário digita 2, 4, -1.",
         tipo="dragdrop",
         resposta_certa="soma = 0|n = int(input())|while n >= 0:|    soma += n|    n = int(input())|print(soma)",
         resposta_erradas="while n > 0:|soma = n|print(n)|if n < 0: break"),
 
-
-    # Fase 8: Funções
+    # ========================== FASE 8: Funções ==========================
     Exercicio(id_exercicio=None, id_fase=8,
         dicas="Use def nome(): para declarar uma função.",
         pergunta="Qual comando define uma função em Python?",
@@ -285,30 +299,33 @@ exercicios = [
 
     Exercicio(id_exercicio=None, id_fase=8,
         dicas="Use return para devolver o valor.",
-        pergunta="Crie uma função que receba dois números e retorne a soma. Escreva exatamente.",
-        tipo="dissertativa", resposta_certa="def soma(a, b):\n    return a + b",
-        resposta_erradas=None),
+        pergunta="Dissertativa: Crie uma função que recebe dois números e imprime a soma deles. Considere que os números passados são 3 e 4. Use input() sem texto dentro dos parênteses.",
+        tipo="dissertativa", resposta_certa='7',
+        resposta_erradas=None,
+        entrada_teste='3\n4'
+    ),
 
     Exercicio(id_exercicio=None, id_fase=8,
         dicas="Defina uma função que retorna se um número é par.",
-        pergunta="Defina uma função que recebe n e retorna True se for par, False caso contrário.",
-        tipo="dissertativa", resposta_certa='def eh_par(n):\n    return n % 2 == 0',
-        resposta_erradas=None),
+        pergunta="Dissertativa: Crie uma função que recebe um número e imprime True se for par, ou False caso contrário. Considere que o número passado é 4. Use input() sem texto dentro dos parênteses.",
+        tipo="dissertativa", resposta_certa='True',
+        resposta_erradas=None,
+        entrada_teste='4'
+    ),
 
     Exercicio(id_exercicio=None, id_fase=8,
         dicas="Arraste para montar uma função que imprime 'Oi'.",
-        pergunta="Monte a função que imprime 'Oi'.",
+        pergunta="Drag&Drop: Monte a função que imprime 'Oi'.",
         tipo="dragdrop",
         resposta_certa="def oi():|    print('Oi')",
         resposta_erradas="def oi:|print('Oi')|def oi()"),
 
     Exercicio(id_exercicio=None, id_fase=8,
         dicas="Arraste para montar uma função que retorna o quadrado de x.",
-        pergunta="Monte a função que retorna o quadrado de x.",
+        pergunta="Drag&Drop: Monte a função que retorna o quadrado de x.",
         tipo="dragdrop",
         resposta_certa="def quadrado(x):|    return x * x",
         resposta_erradas="def quadrado(x):|print(x * x)|return x**2|def quadrado:"),
-
 ]
 
 persistencia = ExercicioPersistenciaImpl()

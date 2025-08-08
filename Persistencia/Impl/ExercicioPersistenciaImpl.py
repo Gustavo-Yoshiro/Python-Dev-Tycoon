@@ -8,26 +8,26 @@ class ExercicioPersistenciaImpl(ExercicioPersistencia):
 
     def salvar(self, exercicio: Exercicio):
         sql = """
-            INSERT INTO exercicio (id_fase, dicas, pergunta, tipo, resposta_certa, resposta_errada)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO exercicio (id_fase, dicas, pergunta, tipo, resposta_certa, resposta_errada, entrada_teste)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """
-        # TRATAMENTO AQUI: garante string
         resposta_erradas = exercicio.get_resposta_erradas()
         if isinstance(resposta_erradas, list):
             resposta_erradas = "|".join(resposta_erradas)
         elif resposta_erradas is None:
             resposta_erradas = ""
 
-        # Parâmetros montados já padronizados:
         parametros = (
             exercicio.get_id_fase(),
             exercicio.get_dicas(),
             exercicio.get_pergunta(),
             exercicio.get_tipo(),
             exercicio.get_resposta_certa(),
-            resposta_erradas
+            resposta_erradas,
+            getattr(exercicio, 'entrada_teste', None) or getattr(exercicio, 'get_entrada_teste', lambda: None)()
         )
         return self.__bd.executar(sql, parametros)
+
 
 
     def buscar_por_id(self, id_exercicio: int) -> Exercicio:
@@ -49,15 +49,17 @@ class ExercicioPersistenciaImpl(ExercicioPersistencia):
     def atualizar(self, exercicio: Exercicio):
         sql = """
             UPDATE exercicio
-            SET id_fase = ?, dicas = ?, tipo = ?, resposta_certa = ?, resposta_errada = ?
+            SET id_fase = ?, dicas = ?, pergunta = ?, tipo = ?, resposta_certa = ?, resposta_errada = ?, entrada_teste = ?
             WHERE id_exercicio = ?
         """
         parametros = (
             exercicio.get_id_fase(),
             exercicio.get_dicas(),
+            exercicio.get_pergunta(),
             exercicio.get_tipo(),
             exercicio.get_resposta_certa(),
             exercicio.get_resposta_erradas(),
+            exercicio.get_entrada_teste(),
             exercicio.get_id_exercicio()
         )
         self.__bd.executar(sql, parametros)

@@ -21,9 +21,9 @@ class TelaIntroducaoTopico:
         self.fonte = pygame.font.SysFont('Consolas', 22)
         self.fonte_pequena = pygame.font.SysFont('Consolas', 20)
 
-        caminho_img = os.path.join("Assets", "TelaJogoIniciante.png")
-        self.bg = pygame.image.load(caminho_img).convert_alpha()
-        self.bg = pygame.transform.smoothscale(self.bg, (largura, altura))
+        #caminho_img = os.path.join("Assets", "TelaJogoIniciante.png")
+        #self.bg = pygame.image.load(caminho_img).convert_alpha()
+        #self.bg = pygame.transform.smoothscale(self.bg, (largura, altura))
 
         # Painel central
         self.rect_painel = pygame.Rect(
@@ -60,7 +60,7 @@ class TelaIntroducaoTopico:
         return linhas
 
     def desenhar(self, tela):
-        tela.blit(self.bg, (0, 0))
+        #tela.blit(self.bg, (0, 0))
         if not self.painel_visivel:
             return
 
@@ -147,6 +147,8 @@ class TelaIntroducaoTopico:
         )
 
     def tratar_eventos(self, eventos):
+        if not self.painel_visivel:
+            return
         for evento in eventos:
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 x, y = evento.pos
