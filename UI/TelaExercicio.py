@@ -522,6 +522,8 @@ class TelaExercicio:
             # Detectar X no prompt
             if self.prompt_visivel and hasattr(self, "rect_x") and evento.type == pygame.MOUSEBUTTONDOWN:
                 if self.rect_x and self.rect_x.collidepoint(evento.pos):
+                    self.dragging = False
+                    #self.input_ativo = False
                     self.prompt_visivel = False
                     return
 

@@ -37,6 +37,43 @@ class GameManager:
         self.fundo_principal = pygame.image.load("assets/TelaJogoIniciante.png")
         self.fundo_principal = pygame.transform.scale(self.fundo_principal, (self.largura, self.altura))
 
+        self.bg_click_rect = pygame.Rect(0, 0, self.largura, self.altura)
+
+        #self.reopen_hotspot = pygame.Rect(self.largura - 180, self.altura - 80, 160, 60)
+
+        self.reopen_hotspot = pygame.Rect(
+            int(self.largura * 0.40), 
+            int(self.altura * 0.36),   
+            250,  # largura
+            230   # altura
+        )
+        self.debug_hotspot = False
+        # Hotspot do notebook em PORCENTAGEM da tela (ajuste fino depois)
+        #self.hotspot_pct = pygame.Rect(0.62, 0.38, 0.18, 0.15)  # x%, y%, w%, h%
+        #self.debug_hotspot = False  # True = desenha contorno pra calibrar
+
+        # cooldown pra evitar reabrir no mesmo clique
+        self._last_closed_at = 0
+        self.reopen_cooldown_ms = 250
+        self.ui_block_until_ms = 0
+
+        # flags pra detectar “acabou de fechar”
+        self._was_intro_visible = True
+        self._was_ex_visible = True
+        self._was_res_visible = True
+        
+        #--------------------------------porta saida------------------#
+        # HOTSPOT DA PORTA (sair do jogo) – valores iniciais; você ajusta depois
+        self.exit_hotspot = pygame.Rect(
+            int(self.largura * 0.08),  # X (esquerda)
+            int(self.altura  * 0.50),  # Y (meio pra baixo)
+            140,                       # largura inicial
+            220                        # altura inicial
+        )
+        self.debug_exit_hotspot = False # True p/ ver o retângulo enquanto calibra
+
+        #---------------------------------------------------------------#
+        
         # Telas
         self.tela_atual = "inicio"
         self.tela_inicio = TelaInicio(
@@ -50,6 +87,17 @@ class GameManager:
         self.tela_exercicio = None
         self.tela_resultado = None
         self.tela_exercicio_salva = None
+
+    #alem do exit da para usar em outros se precisar
+    def algum_painel_visivel(self):
+        if self.tela_atual == "introducao" and self.tela_introducao:
+            return self.tela_introducao.painel_visivel
+        if self.tela_atual == "exercicio" and self.tela_exercicio:
+            return self.tela_exercicio.prompt_visivel
+        if self.tela_atual == "resultado" and self.tela_resultado:
+            return self.tela_resultado.painel_visivel
+        return False
+
 
     def ir_para_tela_save(self):
         """Navega para a tela de seleção de save"""
@@ -281,21 +329,112 @@ class GameManager:
                 self.tela_criar_jogador.desenhar(self.tela)
 
             elif self.tela_atual in ["introducao", "exercicio", "resultado"]:
-                self.tela.blit(self.fundo_principal, (0, 0))  # Fundo fixo
+                # fundo
+                self.tela.blit(self.fundo_principal, (0, 0))
 
+                # === HOTSPOT DA PORTA (sair do jogo) ===
+                self.exit_hotspot.update(
+                    int(self.largura * 0.01),  # X
+                    int(self.altura  * 0.25),  # Y
+                    int(self.largura * 0.06),  # largura
+                    int(self.altura  * 0.49)   # altura
+                )
+
+                if getattr(self, "debug_exit_hotspot", False):
+                    eh = self.exit_hotspot
+                    overlay2 = pygame.Surface((eh.w, eh.h), pygame.SRCALPHA)
+                    pygame.draw.rect(overlay2, (0, 0, 0, 60), overlay2.get_rect(), border_radius=18)
+                    pygame.draw.rect(overlay2, (255, 120, 120, 180), overlay2.get_rect(), width=2, border_radius=18)
+                    self.tela.blit(overlay2, (eh.x, eh.y))
+                # === FIM DO HOTSPOT DA PORTA ===
+                # --- TOOLTIP DA PORTA ---
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if not self.algum_painel_visivel() and self.exit_hotspot.collidepoint((mouse_x, mouse_y)):
+                    font_tooltip = pygame.font.SysFont('Arial', 20, bold=True)
+                    texto_tooltip = "Sair do jogo — seu progresso já está salvo"
+                    txt_surface = font_tooltip.render(texto_tooltip, True, (255, 255, 255))
+
+                    # fundo semi-transparente para o tooltip
+                    bg_surface = pygame.Surface((txt_surface.get_width() + 12, txt_surface.get_height() + 6), pygame.SRCALPHA)
+                    pygame.draw.rect(bg_surface, (0, 0, 0, 180), bg_surface.get_rect(), border_radius=6)
+
+                    # posição (um pouco acima do mouse)
+                    pos_x = mouse_x + 15
+                    pos_y = mouse_y - txt_surface.get_height() - 10
+
+                    self.tela.blit(bg_surface, (pos_x, pos_y))
+                    self.tela.blit(txt_surface, (pos_x + 6, pos_y + 3))
+
+
+                # === BOTÃO VISÍVEL DE REABRIR (só quando o painel daquela tela estiver fechado) ===
+                mostrar_hotspot = False
                 if self.tela_atual == "introducao":
+                    mostrar_hotspot = (self.tela_introducao is not None and not self.tela_introducao.painel_visivel)
+                elif self.tela_atual == "exercicio":
+                    mostrar_hotspot = (self.tela_exercicio is not None and not self.tela_exercicio.prompt_visivel)
+                elif self.tela_atual == "resultado":
+                    mostrar_hotspot = (self.tela_resultado is not None and not self.tela_resultado.painel_visivel)
+
+                if mostrar_hotspot:
+
+                    # recalcula hotspot a cada frame para ser responsivo
+                    self.reopen_hotspot.update(
+                        int(self.largura * 0.40),  # X
+                        int(self.altura  * 0.35),  # Y
+                        int(self.largura * 0.16),  # largura
+                        int(self.altura  * 0.16)   # altura
+                    )
+                    # (opcional) visualizar durante a calibração
+                    if getattr(self, "debug_hotspot", False):
+                        hs = self.reopen_hotspot
+                        overlay = pygame.Surface((hs.w, hs.h), pygame.SRCALPHA)
+                        pygame.draw.rect(overlay, (0, 0, 0, 60), overlay.get_rect(), border_radius=18)
+                        pygame.draw.rect(overlay, (110, 190, 255, 180), overlay.get_rect(), width=2, border_radius=18)
+                        self.tela.blit(overlay, (hs.x, hs.y))
+
+                # 1) fluxo normal primeiro (aqui pode FECHAR)
+                if self.tela_atual == "introducao":
+                    vis_before = self.tela_introducao.painel_visivel
                     self.tela_introducao.tratar_eventos(eventos)
                     self.tela_introducao.desenhar(self.tela)
+                    # marcou o instante em que acabou de fechar
+                    if vis_before and not self.tela_introducao.painel_visivel:
+                        self._last_closed_at = pygame.time.get_ticks()
 
                 elif self.tela_atual == "exercicio":
+                    vis_before = self.tela_exercicio.prompt_visivel
                     self.tela_exercicio.tratar_eventos(eventos)
                     self.tela_exercicio.desenhar(self.tela)
+                    if vis_before and not self.tela_exercicio.prompt_visivel:
+                        self._last_closed_at = pygame.time.get_ticks()
                     if hasattr(self.tela_exercicio, 'finalizado') and self.tela_exercicio.finalizado:
                         self.processar_resultado_exercicio()
 
                 elif self.tela_atual == "resultado":
+                    vis_before = self.tela_resultado.painel_visivel
                     self.tela_resultado.tratar_eventos(eventos)
                     self.tela_resultado.desenhar(self.tela)
+                    if vis_before and not self.tela_resultado.painel_visivel:
+                        self._last_closed_at = pygame.time.get_ticks()
+
+                # 2) reabrir via HOTSPOT (canto inferior direito) com COOLDOWN e só no MOUSEBUTTONUP
+                now = pygame.time.get_ticks()
+                if now - self._last_closed_at >= self.reopen_cooldown_ms:
+                    for ev in eventos:
+                        if ev.type == pygame.MOUSEBUTTONUP and ev.button == 1 and self.reopen_hotspot.collidepoint(ev.pos):
+                            if self.tela_atual == "introducao" and not self.tela_introducao.painel_visivel:
+                                self.tela_introducao.painel_visivel = True
+                            elif self.tela_atual == "exercicio" and not self.tela_exercicio.prompt_visivel:
+                                self.tela_exercicio.prompt_visivel = True
+                                #self.tela_exercicio.dragging = False #se tiver problema com arrastar
+                            elif self.tela_atual == "resultado" and not self.tela_resultado.painel_visivel:
+                                self.tela_resultado.painel_visivel = True
+                        
+                        if ev.type == pygame.MOUSEBUTTONUP and ev.button == 1 and self.exit_hotspot.collidepoint(ev.pos):
+                            if not self.algum_painel_visivel():  
+                                rodando = False
+
+
 
             elif self.tela_atual == "fim":
                 self.mostrar_tela_fim()
