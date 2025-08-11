@@ -125,7 +125,6 @@ class GameManager:
 
             # Atualiza o save no service
             self.save_service.atualizar_save(self.save_atual)
-            self.jogador_service.avancar_fase_jogador(self.jogador_atual.get_id_jogador())
 
     def mostrar_introducao(self, tela_salva=None):
         id_fase = self.id_fases[self.fase_atual]
@@ -197,6 +196,7 @@ class GameManager:
         """Avança para a próxima fase do jogo"""
         if self.fase_atual < len(self.id_fases) - 1:
             self.fase_atual += 1
+            self.jogador_service.avancar_fase_jogador(self.jogador_atual.get_id_jogador())
             self.mostrar_introducao()
         else:
             self.tela_atual = "fim"
