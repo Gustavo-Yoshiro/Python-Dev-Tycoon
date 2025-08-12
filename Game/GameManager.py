@@ -1,15 +1,15 @@
 import pygame
 from datetime import datetime
-from UI.TelaInicio import TelaInicio
-from UI.TelaSave import TelaSave
-from UI.TelaCriarJogador import TelaCriarJogador
-from UI.TelaExercicio import TelaExercicio
-from UI.TelaResultado import TelaResultado
-from UI.TelaIntroducaoTopico import TelaIntroducaoTopico
-from Service.Impl.FaseServiceImpl import FaseServiceImpl
-from Service.Impl.SaveServiceImpl import SaveServiceImpl
-from Service.Impl.JogadorServiceImpl import JogadorServiceImpl
-from Service.Impl.ProgressoFaseServiceImpl import ProgressoFaseServiceImpl
+from Iniciante.UI.TelaInicio import TelaInicio
+from Iniciante.UI.TelaSave import TelaSave
+from Iniciante.UI.TelaCriarJogador import TelaCriarJogador
+from Iniciante.UI.TelaExercicio import TelaExercicio
+from Iniciante.UI.TelaResultado import TelaResultado
+from Iniciante.UI.TelaIntroducaoTopico import TelaIntroducaoTopico
+from Iniciante.Service.Impl.FaseServiceImpl import FaseServiceImpl
+from Iniciante.Service.Impl.SaveServiceImpl import SaveServiceImpl
+from Iniciante.Service.Impl.JogadorServiceImpl import JogadorServiceImpl
+from Iniciante.Service.Impl.ProgressoFaseServiceImpl import ProgressoFaseServiceImpl
 
 class GameManager:
     def __init__(self):
@@ -250,7 +250,7 @@ class GameManager:
             self.tela_atual = "fim"
 
     def reiniciar_exercicio(self):
-        from Service.Impl.ProgressoFaseServiceImpl import ProgressoFaseServiceImpl
+        from Iniciante.Service.Impl.ProgressoFaseServiceImpl import ProgressoFaseServiceImpl
         progresso_service = ProgressoFaseServiceImpl()
         progresso_service.deletar_progresso_por_jogador_fase(
             self.jogador_atual.get_id_jogador(),
