@@ -14,64 +14,62 @@ class BancoDeDadosIntermediario:
             con = self.conectar()
             cursor = con.cursor()
 
-            # Tabela cliente (modo freelancer)
+            # Tabela cliente (NPCs que oferecem trabalhos)
             cursor.execute("""
-              -- Cliente (NPCs que oferecem trabalhos)
-                CREATE TABLE cliente (
-                    id_cliente SERIAL PRIMARY KEY,
-                    nome VARCHAR(100) NOT NULL,
-                    area_atuacao VARCHAR(100), -- Ex: Web, Mobile, Data Science
-                    reputacao INT DEFAULT 50, -- reputação do NPC com o jogador (0 a 100)
-                    descricao TEXT -- pode guardar "história" ou detalhes do cliente
+                CREATE TABLE IF NOT EXISTS cliente (
+                    id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nome TEXT NOT NULL,
+                    area_atuacao TEXT,
+                    reputacao INTEGER DEFAULT 50,
+                    descricao TEXT
                 );
             """)
 
-            # Tabela freelancer (desafios)
+            # Tabela projeto_freelance (trabalhos disponíveis)
             cursor.execute("""
-                        -- Projeto Freelance (trabalhos que aparecem na aba freelancer)
-            CREATE TABLE projeto_freelance (
-                id_projeto SERIAL PRIMARY KEY,
-                id_cliente INT NOT NULL REFERENCES cliente(id_cliente) ON DELETE CASCADE,
-                titulo VARCHAR(150) NOT NULL,
-                descricao TEXT NOT NULL,
-                dificuldade INT NOT NULL, -- 1 = fácil, 2 = médio, 3 = difícil
-                recompensa INT NOT NULL, -- dinheiro que o jogador recebe
-                habilidade_requerida VARCHAR(100), -- exemplo: "Python", "Banco de Dados"
-                status VARCHAR(20) DEFAULT 'disponivel' 
-                -- disponivel, em_andamento, concluido
-            );
-            """)
-
-            # Tabela freelancer_jogador (histórico do jogador)
-            cursor.execute("""
-                -- Ligação entre Jogador e Projeto (quando ele aceita um job)
-                CREATE TABLE jogador_projeto (
-                    id_jogador INT NOT NULL REFERENCES jogador(id_jogador) ON DELETE CASCADE,
-                    id_projeto INT NOT NULL REFERENCES projeto_freelance(id_projeto) ON DELETE CASCADE,
-                    status VARCHAR(20) DEFAULT 'em_andamento', 
-                    -- em_andamento, concluido, falhou
-                    PRIMARY KEY (id_jogador, id_projeto)
+                CREATE TABLE IF NOT EXISTS projeto_freelance (
+                    id_projeto INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_cliente INTEGER NOT NULL,
+                    titulo TEXT NOT NULL,
+                    descricao TEXT NOT NULL,
+                    dificuldade INTEGER NOT NULL,
+                    recompensa INTEGER NOT NULL,
+                    habilidade_requerida TEXT,
+                    status TEXT DEFAULT 'disponivel',
+                    FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente) ON DELETE CASCADE
                 );
-
             """)
+
+            # Tabela jogador_projeto (histórico de projetos aceitos pelo jogador)
             cursor.execute("""
-            -- Chat / Negociação com cliente
-                CREATE TABLE chat_cliente (
-                    id_chat SERIAL PRIMARY KEY,
-                    id_jogador INT NOT NULL REFERENCES jogador(id_jogador) ON DELETE CASCADE,
-                    id_cliente INT NOT NULL REFERENCES cliente(id_cliente) ON DELETE CASCADE,
+                CREATE TABLE IF NOT EXISTS jogador_projeto (
+                    id_jogador INTEGER NOT NULL,
+                    id_projeto INTEGER NOT NULL,
+                    status TEXT DEFAULT 'em_andamento',
+                    PRIMARY KEY (id_jogador, id_projeto),
+                    FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador),
+                    FOREIGN KEY (id_projeto) REFERENCES projeto_freelance(id_projeto)
+                );
+            """)
+
+            # Tabela chat_cliente (mensagens trocadas entre jogador e cliente)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_cliente (
+                    id_chat INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_jogador INTEGER NOT NULL,
+                    id_cliente INTEGER NOT NULL,
                     mensagem TEXT NOT NULL,
-                    enviado_por VARCHAR(20) NOT NULL, 
-                    -- 'jogador' ou 'cliente'
-                    data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    enviado_por TEXT NOT NULL,
+                    data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador),
+                    FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
                 );
-        """)
+            """)
 
             con.commit()
+            print("Banco criado com sucesso.")
         except sqlite3.Error as erro:
             print("Erro ao criar o banco:", erro)
             raise
         finally:
             con.close()
-
-   

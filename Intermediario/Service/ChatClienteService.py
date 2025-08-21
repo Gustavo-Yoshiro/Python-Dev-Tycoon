@@ -1,22 +1,27 @@
 from abc import ABC, abstractmethod
+from Intermediario.Persistencia.Entidade.ChatCliente import ChatCliente
 
-class ClienteService(ABC):
+class ChatClienteService(ABC):
     @abstractmethod
-    def criar_cliente(self, cliente):
+    def enviar_mensagem(self, chat: ChatCliente):
         pass
 
     @abstractmethod
-    def buscar_cliente_por_id(self, id_cliente):
+    def atualizar_mensagem(self, chat: ChatCliente):
         pass
 
     @abstractmethod
-    def listar_clientes(self):
+    def deletar_mensagem(self, id_chat: int):
         pass
 
     @abstractmethod
-    def atualizar_cliente(self, cliente):
+    def buscar_mensagem_por_id(self, id_chat: int):
         pass
 
     @abstractmethod
-    def deletar_cliente(self, id_cliente):
+    def listar_mensagens(self):
+        pass
+
+    @abstractmethod
+    def listar_conversa(self, id_jogador: int, id_cliente: int):
         pass

@@ -1,12 +1,12 @@
 from Intermediario.Persistencia.JogadorProjetoPersistencia import JogadorProjetoPersistencia
 from Intermediario.Persistencia.Entidade.JogadorProjeto import JogadorProjeto
-from Iniciante.Persistencia.Impl.Banco import BancoDeDados  # substitui Conexao
+from Iniciante.Persistencia.Impl.Banco import BancoDeDados
 
 class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
     def __init__(self):
         self.__bd = BancoDeDados()
 
-    def salvar(self, jogador_projeto: JogadorProjeto):
+    def salvar(self, jogador_projeto: JogadorProjeto) -> None:
         sql = """
             INSERT INTO jogador_projeto (id_jogador, id_projeto, status)
             VALUES (?, ?, ?)
@@ -18,7 +18,7 @@ class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
         )
         self.__bd.executar(sql, parametros)
 
-    def buscar(self, id_jogador: int, id_projeto: int):
+    def buscar(self, id_jogador: int, id_projeto: int) -> JogadorProjeto | None:
         sql = """
             SELECT id_jogador, id_projeto, status
             FROM jogador_projeto
@@ -29,7 +29,7 @@ class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
             return JogadorProjeto(*resultado)
         return None
 
-    def listarPorJogador(self, id_jogador: int):
+    def listar_por_jogador(self, id_jogador: int) -> list[JogadorProjeto]:
         sql = """
             SELECT id_jogador, id_projeto, status
             FROM jogador_projeto
@@ -38,7 +38,7 @@ class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
         resultados = self.__bd.executar_query(sql, (id_jogador,))
         return [JogadorProjeto(*row) for row in resultados]
 
-    def atualizarStatus(self, id_jogador: int, id_projeto: int, novo_status: str):
+    def atualizar_status(self, id_jogador: int, id_projeto: int, novo_status: str) -> None:
         sql = """
             UPDATE jogador_projeto
             SET status = ?
@@ -46,3 +46,10 @@ class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
         """
         parametros = (novo_status, id_jogador, id_projeto)
         self.__bd.executar(sql, parametros)
+
+    def remover(self, id_jogador: int, id_projeto: int) -> None:
+        """
+        Remove a relação entre um jogador e um projeto.
+        """
+        sql = "DELETE FROM jogador_projeto WHERE id_jogador = ? AND id_projeto = ?"
+        self.__bd.executar(sql, (id_jogador, id_projeto))
