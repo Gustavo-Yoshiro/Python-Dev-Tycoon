@@ -1,5 +1,5 @@
 from Intermediario.Service.JogadorProjetoService import JogadorProjetoService
-from Persistencia.Impl.JogadorProjetoPersistenciaImpl import JogadorProjetoPersistenciaImpl
+from Intermediario.Persistencia.Impl.JogadorProjetoPersistenciaImpl import JogadorProjetoPersistenciaImpl
 from Intermediario.Persistencia.Entidade.JogadorProjeto import JogadorProjeto
 
 class JogadorProjetoServiceImpl(JogadorProjetoService):

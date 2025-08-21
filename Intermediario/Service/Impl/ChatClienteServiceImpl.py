@@ -1,5 +1,5 @@
 from Intermediario.Service.ChatClienteService import ChatClienteService
-from Persistencia.Impl.ChatClientePersistenciaImpl import ChatClientePersistenciaImpl
+from Intermediario.Persistencia.Impl.ChatClientePersistenciaImpl import ChatClientePersistenciaImpl
 
 class ChatClienteServiceImpl(ChatClienteService):
     def __init__(self):
