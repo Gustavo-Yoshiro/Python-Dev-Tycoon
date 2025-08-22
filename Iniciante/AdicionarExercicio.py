@@ -1,5 +1,5 @@
-from Persistencia.Entidade.Exercicio import Exercicio
-from Persistencia.Impl.ExercicioPersistenciaImpl import ExercicioPersistenciaImpl
+from Iniciante.Persistencia.Entidade.Exercicio import Exercicio
+from Iniciante.Persistencia.Impl.ExercicioPersistenciaImpl import ExercicioPersistenciaImpl
 
 exercicios = [
     # ========================== FASE 1: print() ==========================

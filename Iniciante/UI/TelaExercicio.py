@@ -3,7 +3,7 @@ from Iniciante.Service.Impl.ExercicioServiceImpl import ExercicioServiceImpl
 from Iniciante.Service.Impl.ProgressoFaseServiceImpl import ProgressoFaseServiceImpl
 import random
 import os
-import requests
+from Game.ApiPiston import executar_codigo_piston
 
 class TelaExercicio:
     def __init__(self, largura, altura, nome_topico, total_fases=1, fases_concluidas=0, callback_rever_introducao=None, jogador=None, id_fase=None):
@@ -31,6 +31,21 @@ class TelaExercicio:
 
         # Carrega exercícios e progresso do jogador nesta fase
         self.exercicios, progresso = self.exercicio_service.carregar_exercicios(self.id_fase, self.jogador)
+        # >>> COLE ESTE BLOCO AQUI <<<
+        try:
+            if self.id_fase <= 8 and len(self.exercicios) > 4:
+                objs  = [e for e in self.exercicios if e.get_tipo().lower() == "objetiva"][:2]
+                diss  = [e for e in self.exercicios if e.get_tipo().lower() == "dissertativa"][:1]
+                drags = [e for e in self.exercicios if e.get_tipo().lower() == "dragdrop"][:1]
+                # se faltar algum tipo, completa com o que tiver
+                compact = objs + diss + drags
+                if len(compact) < 4:
+                    resto = [e for e in self.exercicios if e not in compact]
+                    compact += resto[:(4-len(compact))]
+                self.exercicios = compact
+        except Exception:
+            pass
+        # <<< FIM DO BLOCO >>>
 
         if progresso:
             self.indice_atual = progresso.get_indice_exercicio()
@@ -203,23 +218,87 @@ class TelaExercicio:
 
         bar1_rect = pygame.Rect(prompt.x+40, y_barras, prompt.w-80, BAR_HEIGHT)
         bar2_rect = pygame.Rect(prompt.x+40, y_barras+42, prompt.w-80, BAR_HEIGHT)
-        barra1_perc = self.fases_concluidas / self.total_fases if self.total_fases > 0 else 0
-        barra2_perc = (self.indice_atual+1)/len(self.exercicios) if self.exercicios else 0
 
+        # barra 1 (tópicos) = igual
+        barra1_perc = self.fases_concluidas / self.total_fases if self.total_fases > 0 else 0
         pygame.draw.rect(tela, (46, 48, 80), bar1_rect, border_radius=12)
-        pygame.draw.rect(tela, (46, 48, 80), bar2_rect, border_radius=12)
-        pygame.draw.rect(tela, (255, 204, 72), (bar1_rect.x, bar1_rect.y, int(bar1_rect.w*barra1_perc), bar1_rect.h), border_radius=12)
-        pygame.draw.rect(tela, (84, 240, 200), (bar2_rect.x, bar2_rect.y, int(bar2_rect.w*barra2_perc), bar2_rect.h), border_radius=12)
+        pygame.draw.rect(tela, (255, 204, 72),
+                        (bar1_rect.x, bar1_rect.y, int(bar1_rect.w*barra1_perc), bar1_rect.h),
+                        border_radius=12)
 
         t1 = self.fonte_pequena.render(f"Tópicos: {self.fases_concluidas}/{self.total_fases}", True, (60, 60, 90))
-        t2 = self.fonte_pequena.render(f"Questão {self.indice_atual+1}/{len(self.exercicios) if self.exercicios else 1}", True, (40, 130, 110))
         t1_y = bar1_rect.y + (BAR_HEIGHT - t1.get_height()) // 2
-        t2_y = bar2_rect.y + (BAR_HEIGHT - t2.get_height()) // 2
         tela.blit(t1, (bar1_rect.x+8, t1_y))
-        tela.blit(t2, (bar2_rect.x+8, t2_y))
 
+        # barra 2 (questões + MG para iniciante)
+        tem_mg = (self.id_fase is not None and self.id_fase <= 8)
+
+        if tem_mg:
+            # desenha 5 segmentos: 4 questões + 1 MG
+            pygame.draw.rect(tela, (0,0,0,0), bar2_rect)  # apenas garante a área
+            seg_total = 5
+            seg_gap = 6
+            seg_w = (bar2_rect.w - seg_gap*(seg_total-1)) // seg_total
+
+            # quantos já foram concluidos (segmentos cheios)
+            concluidos = max(0, min(self.indice_atual, 4))  # indice_atual é 0..3 aqui
+
+            for i in range(seg_total):
+                seg_x = bar2_rect.x + i * (seg_w + seg_gap)
+                seg = pygame.Rect(seg_x, bar2_rect.y, seg_w, bar2_rect.h)
+
+                # base do segmento
+                base_cor = (46, 48, 80)
+                pygame.draw.rect(tela, base_cor, seg, border_radius=8)
+
+                # preenchidos (questões já concluídas)
+                if i < concluidos:
+                    pygame.draw.rect(tela, (84, 240, 200), seg, border_radius=8)
+
+                # destaque do segmento atual (questão em andamento)
+                if i == self.indice_atual and i < 4 and not self.finalizado:
+                    pygame.draw.rect(tela, (70, 200, 170), seg, 3, border_radius=8)
+
+                # último segmento é o minigame
+                if i == 4:
+                    # borda azul para indicar que é especial
+                    pygame.draw.rect(tela, (110, 190, 255), seg, 2, border_radius=8)
+
+                    # etiqueta "MG" centralizada
+                    mg_lbl = self.fonte_pequena.render("MiniGame", True, (160, 200, 255))
+                    tela.blit(mg_lbl, (seg.centerx - mg_lbl.get_width()//2,
+                                    seg.centery - mg_lbl.get_height()//2))
+
+                    # se já terminou as 4 questões, mostra MG como "próximo" com leve preenchimento
+                    if self.finalizado:
+                        glow = pygame.Surface((seg.w, seg.h), pygame.SRCALPHA)
+                        glow.fill((110, 190, 255, 60))
+                        tela.blit(glow, (seg.x, seg.y))
+
+            # rótulo da barra 2
+            t2_text = f"Questões {min(self.indice_atual+1,4)}/{4}"
+            t2 = self.fonte_pequena.render(t2_text, True, (40, 130, 110))
+            t2_y = bar2_rect.y + (BAR_HEIGHT - t2.get_height()) // 2
+            tela.blit(t2, (bar2_rect.x+8, t2_y))
+
+        else:
+            # fluxo normal (intermediário): barra contínua como era
+            barra2_perc = (self.indice_atual+1)/len(self.exercicios) if self.exercicios else 0
+            pygame.draw.rect(tela, (46, 48, 80), bar2_rect, border_radius=12)
+            pygame.draw.rect(tela, (84, 240, 200),
+                            (bar2_rect.x, bar2_rect.y, int(bar2_rect.w*barra2_perc), bar2_rect.h),
+                            border_radius=12)
+            t2 = self.fonte_pequena.render(
+                f"Questão {self.indice_atual+1}/{len(self.exercicios) if self.exercicios else 1}",
+                True, (40, 130, 110)
+            )
+            t2_y = bar2_rect.y + (BAR_HEIGHT - t2.get_height()) // 2
+            tela.blit(t2, (bar2_rect.x+8, t2_y))
+
+        # continua igual
         y = bar2_rect.bottom + 24
         largura_max = prompt.w - 80
+
 
         # Limite vertical para tudo antes do botão
         btn_w, btn_h = 180, 52
@@ -325,42 +404,63 @@ class TelaExercicio:
                     random.shuffle(blocos)
                     self.blocos_disponiveis = [(bloco, None) for bloco in blocos]
                     self.blocos_resposta = []
-                # Blocos disponíveis
-                fonte_bloco, linhas_bloco_disp = self.ajustar_fonte_para_caber(
+
+                # Título da coluna esquerda
+                fonte_bloco, _ = self.ajustar_fonte_para_caber(
                     "Blocos disponíveis:", self.fonte_pequena, int(prompt.w*0.48)-18, 30
                 )
                 tela.blit(fonte_bloco.render("Blocos disponíveis:", True, (200,200,255)), (prompt.x + 40, y))
-                bloco_altura = max(28, min(35, (btn_y - y - 60)//max(1,len(self.blocos_disponiveis))))
+
+                # Altura dos blocos
+                bloco_altura = max(28, min(35, (btn_y - y - 60)//max(1, len(self.blocos_disponiveis))))
+
+                # --- Blocos disponíveis (ESQUERDA) ---
                 for i, (bloco, _) in enumerate(self.blocos_disponiveis):
-                    rect = pygame.Rect(prompt.x + 40, y+30+i*bloco_altura, int(prompt.w*0.48), bloco_altura-5)
+                    rect = pygame.Rect(prompt.x + 40, y + 30 + i*bloco_altura, int(prompt.w*0.48), bloco_altura-5)
                     pygame.draw.rect(tela, (40, 120, 255), rect)
                     pygame.draw.rect(tela, (30, 40, 90), rect, 2)
-                    fonte_b, linhas_b = self.ajustar_fonte_para_caber(
-                        bloco, self.fonte_pequena, rect.w-12, bloco_altura-9
-                    )
-                    y_b = rect.y + 5
-                    for l_b in linhas_b:
-                        tela.blit(fonte_b.render(l_b, True, (255,255,255)), (rect.x+5, y_b))
-                        y_b += fonte_b.get_height()
+
+                    # PRESERVA indentação: converte TABs para 4 espaços e NÃO usa quebrar_texto
+                    texto = (bloco or "").replace("\t", "    ")
+                    # se por acaso vier com quebras de linha do DB, transforma em espaço simples
+                    texto = texto.replace("\r\n", " ").replace("\n", " ")
+
+                    fonte_b = self.fonte_pequena
+                    # reduz fonte até caber na largura do bloco (sem perder espaços iniciais)
+                    while fonte_b.size(texto)[0] > rect.w - 12 and fonte_b.get_height() > 12:
+                        fonte_b = pygame.font.SysFont('Consolas', fonte_b.get_height() - 1)
+
+                    tela.blit(fonte_b.render(texto, True, (255,255,255)), (rect.x + 5, rect.y + 5))
+
+                    # atualiza o rect no array (necessário pro drag/click)
                     self.blocos_disponiveis[i] = (bloco, rect)
-                # Blocos resposta
-                fonte_bloco2, linhas_bloco2 = self.ajustar_fonte_para_caber(
+
+                # Título da coluna direita
+                fonte_bloco2, _ = self.ajustar_fonte_para_caber(
                     "Sua resposta:", self.fonte_pequena, int(prompt.w*0.43)-16, 30
                 )
                 tela.blit(fonte_bloco2.render("Sua resposta:", True, (120,255,120)), (prompt.x + int(prompt.w*0.55), y))
+
+                # --- Blocos resposta (DIREITA) ---
                 for i, (bloco, _) in enumerate(self.blocos_resposta):
-                    rect = pygame.Rect(prompt.x + int(prompt.w*0.55), y+30+i*bloco_altura, int(prompt.w*0.43), bloco_altura-5)
+                    rect = pygame.Rect(prompt.x + int(prompt.w*0.55), y + 30 + i*bloco_altura, int(prompt.w*0.43), bloco_altura-5)
                     pygame.draw.rect(tela, (80, 210, 80), rect)
                     pygame.draw.rect(tela, (30, 60, 30), rect, 2)
-                    fonte_b, linhas_b = self.ajustar_fonte_para_caber(
-                        bloco, self.fonte_pequena, rect.w-12, bloco_altura-9
-                    )
-                    y_b = rect.y + 5
-                    for l_b in linhas_b:
-                        tela.blit(fonte_b.render(l_b, True, (255,255,255)), (rect.x+5, y_b))
-                        y_b += fonte_b.get_height()
+
+                    texto = (bloco or "").replace("\t", "    ")
+                    texto = texto.replace("\r\n", " ").replace("\n", " ")
+
+                    fonte_b = self.fonte_pequena
+                    while fonte_b.size(texto)[0] > rect.w - 12 and fonte_b.get_height() > 12:
+                        fonte_b = pygame.font.SysFont('Consolas', fonte_b.get_height() - 1)
+
+                    tela.blit(fonte_b.render(texto, True, (255,255,255)), (rect.x + 5, rect.y + 5))
+
                     self.blocos_resposta[i] = (bloco, rect)
+
+                # espaço total ocupado verticalmente por essa seção
                 y += 30 + max(len(self.blocos_disponiveis), len(self.blocos_resposta)) * bloco_altura
+
 
             # --- Botão ENVIAR/CONTINUAR
             self.rect_btn = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
@@ -675,31 +775,8 @@ class TelaExercicio:
                         else:
                             self.finalizado = True
 
-    @staticmethod
-    def executar_codigo_piston(codigo, versao="3.10.0",entrada_teste=""):
-        
-        url = "https://emkc.org/api/v2/piston/execute"
-        payload = {
-            "language": "python",
-            "version": versao,
-            "files": [{"name": "main.py", "content": codigo}],
-            "stdin": entrada_teste if entrada_teste else "",
-            "args": [],
-        }
-        try:
-            resp = requests.post(url, json=payload, timeout=8)
-            resp.raise_for_status()
-            saida = resp.json()
-            if 'output' in saida:
-                return saida['output'].strip()
-            elif 'run' in saida and 'stdout' in saida['run']:
-                return saida['run']['stdout'].strip()
-            elif 'stdout' in saida:
-                return saida['stdout'].strip()
-            else:
-                return "[SEM OUTPUT]"
-        except Exception as e:
-            return f"Erro: {e}"
+    
+    
     def normaliza_saida(saida):
         return ' '.join(saida.strip().split())
     
@@ -726,8 +803,8 @@ class TelaExercicio:
             codigo_usuario = self.get_codigo_usuario()
             entrada_teste = self.exercicio_selecionado.get_entrada_teste() or ""
             
-
-            saida_usuario = self.executar_codigo_piston(codigo_usuario, entrada_teste=entrada_teste)
+            saida_usuario = executar_codigo_piston(codigo_usuario, entrada_teste=entrada_teste)
+            #saida_usuario = self.executar_codigo_piston(codigo_usuario, entrada_teste=entrada_teste)
             resposta_certa = self.exercicio_selecionado.get_resposta_certa().strip()
             if saida_usuario.strip() == resposta_certa:
                 # Só valida o AST se a saída está certa!

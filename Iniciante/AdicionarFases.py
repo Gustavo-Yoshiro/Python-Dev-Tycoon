@@ -1,5 +1,5 @@
-from Persistencia.Entidade.Fase import Fase
-from Persistencia.Impl.FasePersistenciaImpl import FasePersistenciaImpl
+from Iniciante.Persistencia.Entidade.Fase import Fase
+from Iniciante.Persistencia.Impl.FasePersistenciaImpl import FasePersistenciaImpl
 
 fases = [
     Fase(None, "iniciante", "Saída de Dados com print()",

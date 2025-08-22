@@ -25,4 +25,8 @@ class ProgressoFaseService(ABC):
     def atualizar_progresso(self, progresso):
         pass
 
+    @abstractmethod
+    def fase_ja_concluida(self, id_jogador, id_fase, total_exercicios):
+        pass
+
     # Outros métodos específicos, se desejar

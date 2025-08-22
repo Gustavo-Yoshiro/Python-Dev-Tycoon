@@ -64,4 +64,9 @@ class ProgressoFaseServiceImpl(ProgressoFaseService):
 
     
 
-
+    def fase_ja_concluida(self, id_jogador, id_fase, total_exercicios):
+        """Retorna True se todos os exercícios da fase foram concluídos."""
+        progresso = self.progresso_persistencia.buscar_por_jogador_fase(id_jogador, id_fase)
+        if not progresso:
+            return False
+        return progresso.get_indice_exercicio() >= total_exercicios

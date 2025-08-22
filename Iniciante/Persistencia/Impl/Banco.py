@@ -71,7 +71,38 @@ class BancoDeDados:
                                 FOREIGN KEY (id_fase) REFERENCES fase(id_fase)
                             );
                         """)
+            
+            cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS loja (
+                                id_item INTEGER PRIMARY KEY AUTOINCREMENT,
+                                id_jogador INTEGER NOT NULL,           -- quem comprou
+                                nome TEXT NOT NULL,                    -- ex: "Front-end" ou "Social"
+                                categoria TEXT NOT NULL,               -- ex: "iniciante", "intermediario", "avancado"
+                                preco REAL NOT NULL,
+                                duracao_segundos INTEGER,              -- tempo de conclusão (NULL se não usar)
+                                status TEXT DEFAULT 'andamento',       -- "andamento", "concluido", "usado"
+                                duracao_total INTEGER,
+                                FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador)
+                            );
+                        """)
+            cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS evento (
+                            id_evento INTEGER PRIMARY KEY AUTOINCREMENT,
+                            titulo TEXT NOT NULL,                     -- Nome curto do evento (ex: "Hackathon do Google")
+                            descricao TEXT NOT NULL,                  -- Texto descritivo, contextualizando o convite
+                            dificuldade TEXT NOT NULL CHECK(dificuldade IN ('facil', 'medio', 'dificil')),
+                            recompensa_dinheiro REAL NOT NULL,        -- Dinheiro ganho ao concluir
+                            resposta_certa TEXT NOT NULL,             -- Resposta correta esperada
+                            resposta_errada TEXT,                     -- (opcional) respostas comuns erradas
+                            entrada_teste TEXT,                       -- caso queira validar (igual ao exercicio)
+                            tempo_aparecer_min INTEGER,               -- intervalo mínimo para reaparecer (segundos)
+                            tempo_aparecer_max INTEGER,               -- intervalo máximo para reaparecer (segundos)
+                            tempo_para_fazer INTEGER,                 -- limite de tempo (segundos) após aceitar
+                            status TEXT DEFAULT 'ativo'               -- "ativo" ou "usado" (evitar repetir logo em seguida)
+                        );
 
+                                                   
+                           """)
 
 
 

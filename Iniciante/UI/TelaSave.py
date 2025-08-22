@@ -110,7 +110,7 @@ class TelaSave:
         if tipo_fase and tipo_fase.lower() == "iniciante":
             caminho_imagem = "assets/TelaJogoIniciante.png"
         else:
-            caminho_imagem = "assets/TelaJogoIntermediario.png"
+            caminho_imagem = "assets/TelaJogoIniciante.png"
 
         try:
             imagem_fase = pygame.image.load(caminho_imagem)
