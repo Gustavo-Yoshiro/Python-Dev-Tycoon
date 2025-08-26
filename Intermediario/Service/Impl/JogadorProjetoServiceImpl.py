@@ -7,8 +7,11 @@ class JogadorProjetoServiceImpl(JogadorProjetoService):
         self.persistencia = JogadorProjetoPersistenciaImpl()
         self.projeto_persistencia = ProjetoFreelancePersistenciaImpl() 
 
-    def aceitar_projeto(self, jogador_projeto):
+    def aceitar_projeto(self, jogador, projeto):
         # A lógica de negócio (verificar se já tem projeto, etc.) fica no GameManager
+        id_jogador = jogador.get_id()
+        id_projeto = projeto.get_id()
+        jogador_projeto = self.projeto_persistencia.criar(id_jogador,id_projeto)
         # O serviço aqui apenas executa a ação de salvar.
         self.persistencia.salvar(jogador_projeto)
 

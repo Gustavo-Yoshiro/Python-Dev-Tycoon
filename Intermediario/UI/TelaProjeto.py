@@ -113,9 +113,9 @@ class TelaProjeto(Janela):
         tela.blit(req_label, (painel_direito_x, self.rect.y + 210))
         
         barra_w = self.rect.width - painel_esquerdo_w - 60
-        self._desenhar_barra_skill(tela, painel_direito_x, self.rect.y + 240, barra_w, "Backend:", self.jogador.get_nivel_backend(), self.projeto.get_req_backend())
-        self._desenhar_barra_skill(tela, painel_direito_x, self.rect.y + 300, barra_w, "Frontend:", self.jogador.get_nivel_frontend(), self.projeto.get_req_frontend())
-        self._desenhar_barra_skill(tela, painel_direito_x, self.rect.y + 360, barra_w, "Social:", self.jogador.get_nivel_social(), self.projeto.get_req_social())
+        self._desenhar_barra_skill(tela, painel_direito_x, self.rect.y + 240, barra_w, "Backend:", self.jogador.get_backend(), self.projeto.get_req_backend())
+        self._desenhar_barra_skill(tela, painel_direito_x, self.rect.y + 300, barra_w, "Frontend:", self.jogador.get_frontend(), self.projeto.get_req_frontend())
+        self._desenhar_barra_skill(tela, painel_direito_x, self.rect.y + 360, barra_w, "Social:", self.jogador.get_social(), self.projeto.get_req_social())
 
         # --- Rodapé de Ações ---
         rodape_y = self.rect.bottom - 90

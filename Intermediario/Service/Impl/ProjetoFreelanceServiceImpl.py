@@ -18,9 +18,9 @@ class ProjetoFreelanceServiceImpl(ProjetoFreelanceService):
 
         for projeto in projetos_disponiveis:
             pode_aceitar = (
-                jogador.get_nivel_backend() >= projeto.get_req_backend() and
-                jogador.get_nivel_frontend() >= projeto.get_req_frontend() and
-                jogador.get_nivel_social() >= projeto.get_req_social()
+                jogador.get_backend() >= projeto.get_req_backend() and
+                jogador.get_frontend() >= projeto.get_req_frontend() and
+                jogador.get_social() >= projeto.get_req_social()
             )
             projetos_com_status.append({
                 "projeto": projeto,

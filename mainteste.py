@@ -103,9 +103,9 @@ def main():
             return
 
         # 2. Checa se o jogador tem os requisitos de skill
-        tem_req = (JOGADOR_ATUAL.get_nivel_backend() >= projeto.get_req_backend() and
-                   JOGADOR_ATUAL.get_nivel_frontend() >= projeto.get_req_frontend() and
-                   JOGADOR_ATUAL.get_nivel_social() >= projeto.get_req_social())
+        tem_req = (JOGADOR_ATUAL.get_backend() >= projeto.get_req_backend() and
+                   JOGADOR_ATUAL.get_frontend() >= projeto.get_req_frontend() and
+                   JOGADOR_ATUAL.get_social() >= projeto.get_req_social())
 
         if not tem_req:
             print("SKILLS INSUFICIENTES! Não é possível aceitar este contrato.")
@@ -114,6 +114,7 @@ def main():
         # 3. Se tudo estiver certo, aceita o projeto
         # (Aqui você chamaria o service para criar a relação jogador_projeto no banco)
         print(f"Contrato '{projeto.get_titulo()}' aceito com sucesso!")
+        jogador_projeto_service(aceitar_projeto(projeto))
         
         # 4. Volta para a tela de freelance, que agora mostrará o painel de projeto ativo
         abrir_janela_freelance()

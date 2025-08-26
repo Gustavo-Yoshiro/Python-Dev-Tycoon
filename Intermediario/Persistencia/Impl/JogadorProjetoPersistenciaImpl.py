@@ -6,6 +6,10 @@ class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
     def __init__(self):
         self.__bd = BancoDeDados()
 
+    def criar(self,id_jogador, id_projeto):
+        jogador_projeto = JogadorProjeto(id_jogador,id_projeto, "Em andamento")
+        return jogador_projeto
+    
     def salvar(self, jogador_projeto: JogadorProjeto):
         sql = "INSERT INTO jogador_projeto (id_jogador, id_projeto, status) VALUES (?, ?, ?)"
         parametros = (
