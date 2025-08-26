@@ -4,24 +4,26 @@ import random
 from datetime import datetime
 
 # --- Importações de Entidades e Serviços ---
-from Intermediario.Persistencia.Entidade.ChatCliente import ChatCliente
-from Intermediario.Persistencia.Entidade.JogadorProjeto import JogadorProjeto
+from Iniciante.Persistencia.Entidade.Jogador import Jogador
+from Intermediario.Persistencia.Entidade.ProjetoFreelance import ProjetoFreelance
 from Intermediario.Service.Impl.ProjetoFreelanceServiceImpl import ProjetoFreelanceServiceImpl
 from Intermediario.Service.Impl.ClienteServiceImpl import ClienteServiceImpl
-from Intermediario.Service.Impl.ChatClienteServiceImpl import ChatClienteServiceImpl
+from Iniciante.Service.Impl.JogadorServiceImpl import JogadorServiceImpl
 from Intermediario.Service.Impl.JogadorProjetoServiceImpl import JogadorProjetoServiceImpl
+from Intermediario.Service.ValidacaoService import ValidacaoServiceImpl
 
 # --- Importações das Janelas de UI ---
 from Intermediario.UI.TelaFreelance import TelaFreelance
-from Intermediario.UI.TelaProjeto import TelaProjeto
-from Intermediario.UI.TelaChatCliente import TelaChatCliente
-from Intermediario.UI.TelaResultadoFreelance import TelaResultado
+from Intermediario.UI.TelaDesenvolvimento import TelaDesenvolvimento
+# Adicione a importação da sua Janela base
+from Intermediario.UI.Janela import Janela
+
 
 # --- Constantes ---
 LARGURA, ALTURA = 1280, 720
 TELA = pygame.display.set_mode((LARGURA, ALTURA))
-pygame.display.set_caption("Python Dev Tycoon")
-JOGADOR_ID_ATUAL = 1
+pygame.display.set_caption("Python Dev Tycoon - F.L.N.C.R. System")
+JOGADOR_ID_ATUAL = 1 # ID do jogador fixo para testes
 
 def main():
     pygame.init()
@@ -32,14 +34,21 @@ def main():
         fundo_jogo = pygame.image.load("assets/TelaJogoIniciante.png").convert()
         fundo_jogo = pygame.transform.scale(fundo_jogo, (LARGURA, ALTURA))
     except pygame.error as e:
-        print(f"Erro ao carregar imagem: {e}")
+        print(f"Erro ao carregar imagem de fundo: {e}")
         fundo_jogo = pygame.Surface((LARGURA, ALTURA)); fundo_jogo.fill((25, 25, 35))
         
     # --- Inicialização dos Serviços ---
     projeto_service = ProjetoFreelanceServiceImpl()
     cliente_service = ClienteServiceImpl()
-    chat_service = ChatClienteServiceImpl()
+    jogador_service = JogadorServiceImpl()
     jogador_projeto_service = JogadorProjetoServiceImpl()
+    validacao_service = ValidacaoServiceImpl()
+
+    # Carrega o jogador atual do banco de dados
+    JOGADOR_ATUAL = jogador_service.buscar_jogador_por_id(1)
+    if not JOGADOR_ATUAL:
+        print("ERRO FATAL: Jogador com ID 1 não encontrado no banco de dados.")
+        return
 
     # --- Gerenciador de Janelas ---
     janelas_abertas = []
@@ -49,62 +58,53 @@ def main():
     # --- Funções de Orquestração (Callbacks) ---
 
     def abrir_janela_freelance():
-        if any(isinstance(j, TelaFreelance) for j in janelas_abertas): return
-        projetos = projeto_service.listar_projetos_disponiveis()
+        """Abre a janela principal de freelance, que se adapta se houver um projeto ativo."""
+        janelas_abertas.clear()
+        
+        projeto_ativo = jogador_projeto_service.buscar_projeto_ativo(JOGADOR_ATUAL.get_id_jogador())
+        
+        projetos_disponiveis = []
+        if not projeto_ativo:
+            projetos_disponiveis = projeto_service.listar_disponiveis()
+
         janela = TelaFreelance(
-            projetos=projetos,
+            LARGURA, ALTURA,
+            projeto_ativo=projeto_ativo,
+            projetos_disponiveis=projetos_disponiveis,
+            jogador=JOGADOR_ATUAL,
             cliente_service=cliente_service,
-            callback_ver_detalhes=abrir_janela_detalhes # <--- CORRIGIDO
+            callback_abrir_dev=abrir_janela_desenvolvimento,
+            callback_ver_detalhes=abrir_janela_desenvolvimento # Ambos os callbacks levam para o IDE
         )
         janelas_abertas.append(janela)
 
-    def abrir_janela_detalhes(projeto):
-        cliente = cliente_service.buscar_cliente_por_id(projeto.get_id_cliente())
-        janela = TelaProjeto(
-            projeto=projeto, cliente=cliente,
-            callback_aceitar=aceitar_projeto,
-            callback_chat=abrir_janela_chat,
-            callback_voltar=abrir_janela_freelance # Voltar reabre a lista
-        )
-        janelas_abertas.append(janela)
-
-    def aceitar_projeto(projeto):
-        relacao = jogador_projeto_service.buscar_relacao(JOGADOR_ID_ATUAL, projeto.get_id_projeto())
-        if not relacao:
-            novo_projeto = JogadorProjeto(JOGADOR_ID_ATUAL, projeto.get_id_projeto(), "em_andamento")
-            jogador_projeto_service.aceitar_projeto(novo_projeto)
-        print(f"Projeto {projeto.get_titulo()} aceito!")
-        abrir_janela_chat(projeto)
-
-    def abrir_janela_chat(projeto):
-        # Fecha outras janelas para focar no chat
+    def abrir_janela_desenvolvimento(projeto):
+        """Abre o IDE para trabalhar em um projeto."""
         janelas_abertas.clear()
         cliente = cliente_service.buscar_cliente_por_id(projeto.get_id_cliente())
-        mensagens = chat_service.persistencia.listarPorCliente(cliente.get_id_cliente())
-        janela = TelaChatCliente(
-            projeto=projeto, cliente=cliente, mensagens=mensagens,
-            callback_enviar=enviar_mensagem,
-            callback_finalizar=finalizar_projeto,
-            # Voltar do chat reabre a janela de detalhes
-            callback_voltar=lambda: abrir_janela_detalhes(projeto) 
+        
+        janela = TelaDesenvolvimento(
+            LARGURA, ALTURA,
+            projeto=projeto,
+            cliente=cliente,
+            callback_validar=validar_solucao_jogador,
+            callback_desistir=abrir_janela_freelance # Desistir volta para a lista
         )
         janelas_abertas.append(janela)
 
-    def enviar_mensagem(projeto, texto_resposta):
-        nova_msg = ChatCliente(None, JOGADOR_ID_ATUAL, projeto.get_id_cliente(), texto_resposta, 'jogador', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        chat_service.persistencia.salvar(nova_msg)
-        abrir_janela_chat(projeto)
-
-    def finalizar_projeto(projeto):
-        sucesso = random.random() < 0.8
-        status = "concluido" if sucesso else "falhou"
-        jogador_projeto_service.atualizar_status(JOGADOR_ID_ATUAL, projeto.get_id_projeto(), status)
-        abrir_janela_resultado(sucesso, projeto.get_recompensa())
-
-    def abrir_janela_resultado(sucesso, recompensa):
-        janelas_abertas.clear()
-        janela = TelaResultado(sucesso, recompensa, callback_continuar=abrir_janela_freelance)
-        janelas_abertas.append(janela)
+    def validar_solucao_jogador(projeto, codigo_jogador):
+        """Função chamada pelo botão 'Executar Testes' no IDE."""
+        print("Validando código...")
+        resultado = validacao_service.validar_solucao(projeto, codigo_jogador)
+        
+        if resultado["sucesso"]:
+            print("Todos os testes passaram! Projeto concluído!")
+            # Lógica para finalizar o projeto, dar recompensa, etc.
+            # Ex: jogador_projeto_service.finalizar_projeto(JOGADOR_ATUAL.get_id_jogador(), projeto.get_id_projeto())
+        else:
+            print("Falha nos testes.")
+            
+        return resultado # Retorna o dicionário completo com o log
 
     # --- Callbacks do Menu Principal ---
     callbacks_principais = {
@@ -124,19 +124,16 @@ def main():
     # --- Loop Principal do Jogo ---
     rodando = True
     while rodando:
+        dt = clock.tick(60)
         eventos = pygame.event.get()
         mouse_pos = pygame.mouse.get_pos()
         
         for evento in eventos:
-            if evento.type == pygame.QUIT:
-                rodando = False
+            if evento.type == pygame.QUIT: rodando = False
             if evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE:
-                if janelas_abertas:
-                    janelas_abertas[-1].deve_fechar = True
-                elif menu_principal_visivel:
-                    menu_principal_visivel = False
-                else:
-                    rodando = False
+                if janelas_abertas: janelas_abertas[-1].deve_fechar = True
+                elif menu_principal_visivel: menu_principal_visivel = False
+                else: rodando = False
 
             if janelas_abertas:
                 janelas_abertas[-1].tratar_eventos([evento])
@@ -145,21 +142,21 @@ def main():
                     if menu_principal_visivel:
                         for nome, rect in botoes_principais_rects.items():
                             if rect.collidepoint(evento.pos):
-                                callbacks_principais[nome]()
-                                menu_principal_visivel = False
-                                break
+                                callbacks_principais[nome](); menu_principal_visivel = False; break
                     elif hotspot_computador.collidepoint(evento.pos):
                         menu_principal_visivel = True
 
-        # --- Lógica de Desenho ---
+        if janelas_abertas:
+            janela_topo = janelas_abertas[-1]
+            if hasattr(janela_topo, 'update'): janela_topo.update(dt)
+
         TELA.blit(fundo_jogo, (0, 0))
         
         if not janelas_abertas and menu_principal_visivel:
             for nome, rect in botoes_principais_rects.items():
                 cor_fundo = (0, 0, 0, 150) if rect.collidepoint(mouse_pos) else (0, 0, 0, 100)
                 cor_texto = (255, 255, 255) if rect.collidepoint(mouse_pos) else (200, 200, 200)
-                fundo_surf = pygame.Surface(rect.size, pygame.SRCALPHA)
-                fundo_surf.fill(cor_fundo)
+                fundo_surf = pygame.Surface(rect.size, pygame.SRCALPHA); fundo_surf.fill(cor_fundo)
                 TELA.blit(fundo_surf, rect.topleft)
                 texto_surf = fonte_menu_principal.render(nome, True, cor_texto)
                 TELA.blit(texto_surf, (rect.centerx - texto_surf.get_width() // 2, rect.centery - texto_surf.get_height() // 2))
@@ -169,14 +166,11 @@ def main():
 
         pygame.display.flip()
 
-        # --- Limpeza de Janelas ---
         janelas_fechadas_neste_frame = any(j.deve_fechar for j in janelas_abertas)
         janelas_abertas = [j for j in janelas_abertas if not j.deve_fechar]
         
         if not janelas_abertas and janelas_fechadas_neste_frame and not menu_principal_visivel:
             menu_principal_visivel = True
-
-        clock.tick(60)
 
     pygame.quit()
     sys.exit()
