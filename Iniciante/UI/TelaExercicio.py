@@ -5,6 +5,12 @@ import random
 import os
 from Game.ApiPiston import executar_codigo_piston
 
+# Views
+from Iniciante.UI.View.ObjectiveView import ObjectiveView
+from Iniciante.UI.View.DragDropView import DragDropView
+from Iniciante.UI.View.DissertativeView import DissertativeView
+
+
 class TelaExercicio:
     def __init__(self, largura, altura, nome_topico, total_fases=1, fases_concluidas=0, callback_rever_introducao=None, jogador=None, id_fase=None):
         # Básicos
@@ -31,13 +37,11 @@ class TelaExercicio:
 
         # Carrega exercícios e progresso do jogador nesta fase
         self.exercicios, progresso = self.exercicio_service.carregar_exercicios(self.id_fase, self.jogador)
-        # >>> COLE ESTE BLOCO AQUI <<<
         try:
             if self.id_fase <= 8 and len(self.exercicios) > 4:
                 objs  = [e for e in self.exercicios if e.get_tipo().lower() == "objetiva"][:2]
                 diss  = [e for e in self.exercicios if e.get_tipo().lower() == "dissertativa"][:1]
                 drags = [e for e in self.exercicios if e.get_tipo().lower() == "dragdrop"][:1]
-                # se faltar algum tipo, completa com o que tiver
                 compact = objs + diss + drags
                 if len(compact) < 4:
                     resto = [e for e in self.exercicios if e not in compact]
@@ -45,7 +49,6 @@ class TelaExercicio:
                 self.exercicios = compact
         except Exception:
             pass
-        # <<< FIM DO BLOCO >>>
 
         if progresso:
             self.indice_atual = progresso.get_indice_exercicio()
@@ -63,18 +66,9 @@ class TelaExercicio:
             self.finalizado = False
             self.exercicio_selecionado = self.exercicios[self.indice_atual] if self.exercicios else None
         
-        self.scroll_offset_x = 0
-        self.input_ativo = False
-        self.input_text = [""]
-        self.cursor_pos = [0, 0]
-        self.scroll_offset = 0
-        self.linhas_visiveis = 5
         self.resultado = ""
         self.feedback_ativo = False
         self.resposta_usuario = ""
-        self.alternativa_selecionada = None
-        self.blocos_disponiveis = []
-        self.blocos_resposta = []
         
         pygame.font.init()
         self.fonte = pygame.font.SysFont('Consolas', 24)
@@ -88,19 +82,28 @@ class TelaExercicio:
 
         self.prompt_visivel = True
         self.prompt_msg = ""
-        self.rect_prompt = pygame.Rect(
-            int(largura * 0.25),
-            int(altura * 0.13),
-            int(largura * 0.54),
-            int(altura * 0.66)
-        )
+        self.rect_prompt = pygame.Rect(int(largura * 0.25), int(altura * 0.13), int(largura * 0.54), int(altura * 0.66))
         self.rect_q = None
         self.rect_x = None
         self.rect_btn = None
-        self.rect_alternativas = []
 
         self.mouse_down_ao_entrar = pygame.mouse.get_pressed()[0]
 
+        # Views
+        self.view_objetiva = ObjectiveView(self.fonte, self.fonte_pequena)
+        self.view_dragdrop = DragDropView(self.fonte, self.fonte_pequena)
+        self.view_dissertativa = DissertativeView(self.fonte, self.fonte_pequena, self.fonte_editor, linhas_visiveis=5)
+
+        if self.exercicio_selecionado:
+            t = self.exercicio_selecionado.get_tipo().lower()
+            if t == "objetiva":
+                self.view_objetiva.set_exercicio(self.exercicio_selecionado)
+            elif t == "dragdrop":
+                self.view_dragdrop.set_exercicio(self.exercicio_selecionado)
+            elif t == "dissertativa":
+                self.view_dissertativa.set_exercicio(self.exercicio_selecionado)
+
+    # --------------------- Utils locais ---------------------
     @staticmethod
     def clamp(val, mini, maxi):
         return max(mini, min(val, maxi))
@@ -142,11 +145,8 @@ class TelaExercicio:
         self.rect_prompt.x = int(self.largura * 0.25)
         self.rect_prompt.y = int(self.altura * 0.13)
 
-    def get_codigo_usuario(self):
-        return "\n".join(self.input_text).rstrip()
-
+    # --------------------- Render ---------------------
     def desenhar(self, tela):
-
         if not self.prompt_visivel:
             return
 
@@ -170,13 +170,8 @@ class TelaExercicio:
         usuario_surface = self.fonte_pequena.render(usuario_txt, True, (230, 230, 90))
         tela.blit(usuario_surface, (prompt.x + 28, prompt.y + header_h + 6))
         y_usuario = prompt.y + header_h + 6 + usuario_surface.get_height() + 4
-        pygame.draw.line(
-            tela,
-            (80, 120, 180),
-            (prompt.x + 28, y_usuario),
-            (prompt.x + prompt.w - 28, y_usuario),
-            2
-        )
+        pygame.draw.line(tela, (80, 120, 180), (prompt.x + 28, y_usuario), (prompt.x + prompt.w - 28, y_usuario), 2)
+
         # ? e X
         self.rect_q = pygame.Rect(prompt.right-90, prompt.y+10, 30, 30)
         self.rect_x = pygame.Rect(prompt.right-45, prompt.y+10, 30, 30)
@@ -186,7 +181,8 @@ class TelaExercicio:
         pygame.draw.circle(tela, (255, 100, 100), self.rect_x.center, 15)
         x_mark = self.fonte_pequena.render("x", True, (40, 0, 0))
         tela.blit(x_mark, (self.rect_x.x+9, self.rect_x.y+4))
-        # Tooltip
+
+        # Tooltips
         mx, my = pygame.mouse.get_pos()
         if self.rect_q.collidepoint(mx, my):
             texto_ajuda = "Clique para ver a introdução do tópico novamente."
@@ -211,100 +207,64 @@ class TelaExercicio:
 
         # -------- Barras de Progresso --------
         BAR_HEIGHT = 28
-        usuario_surface = self.fonte_pequena.render(f"Usuário logado: {self.nome_jogador}", True, (230, 230, 90))
         espaco_usuario = usuario_surface.get_height() + 18
-
         y_barras = prompt.y + header_h + espaco_usuario
 
         bar1_rect = pygame.Rect(prompt.x+40, y_barras, prompt.w-80, BAR_HEIGHT)
         bar2_rect = pygame.Rect(prompt.x+40, y_barras+42, prompt.w-80, BAR_HEIGHT)
 
-        # barra 1 (tópicos) = igual
+        # barra 1 (tópicos)
         barra1_perc = self.fases_concluidas / self.total_fases if self.total_fases > 0 else 0
         pygame.draw.rect(tela, (46, 48, 80), bar1_rect, border_radius=12)
-        pygame.draw.rect(tela, (255, 204, 72),
-                        (bar1_rect.x, bar1_rect.y, int(bar1_rect.w*barra1_perc), bar1_rect.h),
-                        border_radius=12)
-
+        pygame.draw.rect(tela, (255, 204, 72), (bar1_rect.x, bar1_rect.y, int(barra1_perc*bar1_rect.w), bar1_rect.h), border_radius=12)
         t1 = self.fonte_pequena.render(f"Tópicos: {self.fases_concluidas}/{self.total_fases}", True, (60, 60, 90))
-        t1_y = bar1_rect.y + (BAR_HEIGHT - t1.get_height()) // 2
-        tela.blit(t1, (bar1_rect.x+8, t1_y))
+        tela.blit(t1, (bar1_rect.x+8, bar1_rect.y + (BAR_HEIGHT - t1.get_height()) // 2))
 
         # barra 2 (questões + MG para iniciante)
         tem_mg = (self.id_fase is not None and self.id_fase <= 8)
-
         if tem_mg:
-            # desenha 5 segmentos: 4 questões + 1 MG
-            pygame.draw.rect(tela, (0,0,0,0), bar2_rect)  # apenas garante a área
+            pygame.draw.rect(tela, (0,0,0,0), bar2_rect)
             seg_total = 5
             seg_gap = 6
             seg_w = (bar2_rect.w - seg_gap*(seg_total-1)) // seg_total
-
-            # quantos já foram concluidos (segmentos cheios)
-            concluidos = max(0, min(self.indice_atual, 4))  # indice_atual é 0..3 aqui
-
+            concluidos = max(0, min(self.indice_atual, 4))
             for i in range(seg_total):
                 seg_x = bar2_rect.x + i * (seg_w + seg_gap)
                 seg = pygame.Rect(seg_x, bar2_rect.y, seg_w, bar2_rect.h)
-
-                # base do segmento
-                base_cor = (46, 48, 80)
-                pygame.draw.rect(tela, base_cor, seg, border_radius=8)
-
-                # preenchidos (questões já concluídas)
+                pygame.draw.rect(tela, (46, 48, 80), seg, border_radius=8)
                 if i < concluidos:
                     pygame.draw.rect(tela, (84, 240, 200), seg, border_radius=8)
-
-                # destaque do segmento atual (questão em andamento)
                 if i == self.indice_atual and i < 4 and not self.finalizado:
                     pygame.draw.rect(tela, (70, 200, 170), seg, 3, border_radius=8)
-
-                # último segmento é o minigame
                 if i == 4:
-                    # borda azul para indicar que é especial
                     pygame.draw.rect(tela, (110, 190, 255), seg, 2, border_radius=8)
-
-                    # etiqueta "MG" centralizada
                     mg_lbl = self.fonte_pequena.render("MiniGame", True, (160, 200, 255))
-                    tela.blit(mg_lbl, (seg.centerx - mg_lbl.get_width()//2,
-                                    seg.centery - mg_lbl.get_height()//2))
-
-                    # se já terminou as 4 questões, mostra MG como "próximo" com leve preenchimento
+                    tela.blit(mg_lbl, (seg.centerx - mg_lbl.get_width()//2, seg.centery - mg_lbl.get_height()//2))
                     if self.finalizado:
                         glow = pygame.Surface((seg.w, seg.h), pygame.SRCALPHA)
                         glow.fill((110, 190, 255, 60))
                         tela.blit(glow, (seg.x, seg.y))
-
-            # rótulo da barra 2
             t2_text = f"Questões {min(self.indice_atual+1,4)}/{4}"
             t2 = self.fonte_pequena.render(t2_text, True, (40, 130, 110))
-            t2_y = bar2_rect.y + (BAR_HEIGHT - t2.get_height()) // 2
-            tela.blit(t2, (bar2_rect.x+8, t2_y))
-
+            tela.blit(t2, (bar2_rect.x+8, bar2_rect.y + (BAR_HEIGHT - t2.get_height()) // 2))
         else:
-            # fluxo normal (intermediário): barra contínua como era
             barra2_perc = (self.indice_atual+1)/len(self.exercicios) if self.exercicios else 0
             pygame.draw.rect(tela, (46, 48, 80), bar2_rect, border_radius=12)
-            pygame.draw.rect(tela, (84, 240, 200),
-                            (bar2_rect.x, bar2_rect.y, int(bar2_rect.w*barra2_perc), bar2_rect.h),
-                            border_radius=12)
-            t2 = self.fonte_pequena.render(
-                f"Questão {self.indice_atual+1}/{len(self.exercicios) if self.exercicios else 1}",
-                True, (40, 130, 110)
-            )
-            t2_y = bar2_rect.y + (BAR_HEIGHT - t2.get_height()) // 2
-            tela.blit(t2, (bar2_rect.x+8, t2_y))
+            pygame.draw.rect(tela, (84, 240, 200), (bar2_rect.x, bar2_rect.y, int(bar2_rect.w*barra2_perc), bar2_rect.h), border_radius=12)
+            t2 = self.fonte_pequena.render(f"Questão {self.indice_atual+1}/{len(self.exercicios) if self.exercicios else 1}", True, (40, 130, 110))
+            tela.blit(t2, (bar2_rect.x+8, bar2_rect.y + (BAR_HEIGHT - t2.get_height()) // 2))
 
-        # continua igual
+        # ---------------------- Área de conteúdo e botão ----------------------
         y = bar2_rect.bottom + 24
         largura_max = prompt.w - 80
 
-
-        # Limite vertical para tudo antes do botão
+        # Botão ENVIAR/CONTINUAR
         btn_w, btn_h = 180, 52
-        btn_x = prompt.x + (prompt.w-btn_w)//2
+        btn_x = prompt.x + (prompt.w - btn_w) // 2
         btn_y = prompt.bottom - btn_h - 18
+
         altura_total = btn_y - y - 16
+        content_rect = pygame.Rect(prompt.x + 40, y, prompt.w - 80, max(0, altura_total))
 
         if self.finalizado:
             msg = f"Quiz finalizado!"
@@ -314,200 +274,70 @@ class TelaExercicio:
             return
 
         if self.exercicio_selecionado:
-            # ------- PERGUNTA responsiva
-            fonte_pergunta, linhas_pergunta = self.ajustar_fonte_para_caber(
-                self.exercicio_selecionado.get_pergunta(), self.fonte_pequena, largura_max, altura_total//3
-            )
-            for linha in linhas_pergunta:
-                tela.blit(fonte_pergunta.render(linha, True, (255, 255, 255)), (prompt.x + 40, y))
-                y += fonte_pergunta.get_height() + 2
-
-            # ------- DICA responsiva
-            fonte_dica, linhas_dica = self.ajustar_fonte_para_caber(
-                f"Dica: {self.exercicio_selecionado.get_dicas()}", self.fonte_pequena, largura_max, altura_total//4
-            )
-            for linha in linhas_dica:
-                tela.blit(fonte_dica.render(linha, True, (180, 180, 0)), (prompt.x + 40, y))
-                y += fonte_dica.get_height() + 2
-
             tipo = self.exercicio_selecionado.get_tipo().lower()
-            # ---------- OBJETIVA ----------
+
             if tipo == "objetiva":
-                erradas = self.exercicio_selecionado.get_resposta_erradas()[:3] if self.exercicio_selecionado.get_resposta_erradas() else []
-                alternativas = [self.exercicio_selecionado.get_resposta_certa()] + erradas
-                random.seed(self.exercicio_selecionado.get_id_exercicio())
-                random.shuffle(alternativas)
-                letras = ['A', 'B', 'C', 'D'][:len(alternativas)]
-                self.rect_alternativas = []
-                # Calcule espaço para cada alternativa
-                altura_restante = btn_y - y - 14
-                alt_h = max(30, min(42, altura_restante // max(1,len(alternativas))))
-                for idx, alt in enumerate(alternativas):
-                    rect = pygame.Rect(prompt.x + 40, y, prompt.w - 80, alt_h)
-                    self.rect_alternativas.append((rect, alt, idx))
-                    cor = (200, 200, 50)
-                    pygame.draw.rect(tela, cor, rect, 0)
-                    if self.alternativa_selecionada == idx:
-                        pygame.draw.rect(tela, (0, 180, 255), rect, 4)
-                    else:
-                        pygame.draw.rect(tela, (80, 80, 80), rect, 2)
-                    fonte_alt, linhas_alt = self.ajustar_fonte_para_caber(
-                        f"{letras[idx]}) {alt}", self.fonte_pequena, rect.w-18, alt_h-6
-                    )
-                    y_alt = rect.y + 4
-                    for linha in linhas_alt:
-                        tela.blit(fonte_alt.render(linha, True, (0, 0, 0)), (rect.x + 10, y_alt))
-                        y_alt += fonte_alt.get_height()
-                    y += alt_h + 5
-            # ---------- DISSERTATIVA ----------
+                if self.view_objetiva.exercicio != self.exercicio_selecionado:
+                    self.view_objetiva.set_exercicio(self.exercicio_selecionado)
+                self.view_objetiva.draw(tela, content_rect, feedback_ativo=self.feedback_ativo)
+
             elif tipo == "dissertativa":
-                linhas = self.linhas_visiveis
-                CAIXA_OFFSET = 40
-                editor_h = linhas * self.fonte_editor.get_height() + 16
-                caixa = pygame.Rect(prompt.x+40, y + CAIXA_OFFSET, prompt.w-80, editor_h)
-                pygame.draw.rect(tela, (52, 56, 64), caixa)
-                pygame.draw.rect(tela, (70, 120, 200), caixa, 2)
-                total_linhas = len(self.input_text)
-                linha, coluna = self.cursor_pos
-                largura_caixa = caixa.w - 30
-                for idx in range(self.scroll_offset, min(self.scroll_offset + linhas, total_linhas)):
-                    y_linha = caixa.y + (idx - self.scroll_offset) * self.editor_lh + 6
-                    linha_num_surface = self.fonte_editor.render(str(idx+1).rjust(2), True, (90, 160, 220))
-                    tela.blit(linha_num_surface, (caixa.x-26, y_linha))
-                    if idx == linha:
-                        pygame.draw.rect(tela, (38, 54, 92), (caixa.x+6, y_linha-2, largura_caixa, self.editor_lh))
-                    linha_texto = self.input_text[idx]
-                    scroll_x = self.scroll_offset_x if idx == linha else 0
-                    texto_visivel = linha_texto[scroll_x:]
-                    while self.fonte_editor.size(texto_visivel)[0] > largura_caixa and len(texto_visivel) > 0:
-                        texto_visivel = texto_visivel[:-1]
-                    texto_surface = self.fonte_editor.render(texto_visivel, True, (255,255,255))
-                    tela.blit(texto_surface, (caixa.x+18, y_linha))
-                # Cursor piscando igual antes
-                if self.input_ativo and self.scroll_offset <= linha < self.scroll_offset+linhas:
-                    tempo = pygame.time.get_ticks()
-                    if (tempo // 500) % 2 == 0:
-                        y_cursor = caixa.y + (linha - self.scroll_offset) * self.editor_lh + 6
-                        texto_ate_cursor = self.input_text[linha][self.scroll_offset_x:coluna]
-                        cursor_x = caixa.x+18 + self.fonte_editor.size(texto_ate_cursor)[0]
-                        pygame.draw.line(tela, (0,255,0), (cursor_x, y_cursor+4), (cursor_x, y_cursor+self.editor_lh-6), 2)
-                y = caixa.bottom + 10
+                if self.view_dissertativa.exercicio != self.exercicio_selecionado:
+                    self.view_dissertativa.set_exercicio(self.exercicio_selecionado)
+                self.view_dissertativa.draw(tela, content_rect, feedback_ativo=self.feedback_ativo)
 
-            # ---------- DRAGDROP ----------
             elif tipo == "dragdrop":
-                if not self.blocos_disponiveis and not self.blocos_resposta:
-                    resposta_certa = self.exercicio_selecionado.get_resposta_certa()
-                    erradas = self.exercicio_selecionado.get_resposta_erradas()
-                    blocos_certos = resposta_certa.split("|")
-                    blocos_errados = erradas if erradas else []
-                    blocos = blocos_certos + blocos_errados
-                    random.shuffle(blocos)
-                    self.blocos_disponiveis = [(bloco, None) for bloco in blocos]
-                    self.blocos_resposta = []
+                if self.view_dragdrop.exercicio != self.exercicio_selecionado:
+                    self.view_dragdrop.set_exercicio(self.exercicio_selecionado)
+                self.view_dragdrop.draw(tela, content_rect, feedback_ativo=self.feedback_ativo)
 
-                # Título da coluna esquerda
-                fonte_bloco, _ = self.ajustar_fonte_para_caber(
-                    "Blocos disponíveis:", self.fonte_pequena, int(prompt.w*0.48)-18, 30
-                )
-                tela.blit(fonte_bloco.render("Blocos disponíveis:", True, (200,200,255)), (prompt.x + 40, y))
+        # --- Botão ENVIAR/CONTINUAR
+        self.rect_btn = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+        pode = self.pode_enviar()
+        cor_btn = (0, 180, 80) if not self.feedback_ativo and pode else (0, 150, 200) if self.feedback_ativo else (80, 80, 80)
+        pygame.draw.rect(tela, cor_btn, self.rect_btn, border_radius=24)
+        label_btn = "ENVIAR" if not self.feedback_ativo else "CONTINUAR"
+        fonte_btn, linhas_btn = self.ajustar_fonte_para_caber(label_btn, self.fonte_pequena, btn_w-10, btn_h-10)
+        y_btn = self.rect_btn.y + (btn_h - sum(self.fonte_pequena.get_height() for _ in linhas_btn)) // 2
+        for l_btn in linhas_btn:
+            txtsurf = self.fonte_pequena.render(l_btn, True, (255,255,255))
+            tela.blit(txtsurf, (self.rect_btn.x + (btn_w - txtsurf.get_width()) // 2, y_btn))
+            y_btn += self.fonte_pequena.get_height()
 
-                # Altura dos blocos
-                bloco_altura = max(28, min(35, (btn_y - y - 60)//max(1, len(self.blocos_disponiveis))))
+        # --- Feedback
+        if self.resultado:
+            cor = (0, 255, 0) if "Correta" in self.resultado else (255, 0, 0)
+            feedback_x = self.rect_btn.right + 30
+            feedback_y = self.rect_btn.y + self.rect_btn.height // 2 - self.fonte_pequena.get_height() // 2 - 8
+            msg_curta = "Resposta Correta!" if "Correta" in self.resultado else "Resposta Incorreta!"
+            fonte_fb, linhas_fb = self.ajustar_fonte_para_caber(msg_curta, self.fonte_pequena, 220, self.rect_btn.h-2)
+            y_fb = feedback_y
+            for l_fb in linhas_fb:
+                tela.blit(fonte_fb.render(l_fb, True, cor), (feedback_x, y_fb))
+                y_fb += fonte_fb.get_height()
+            if "Saída:" in self.resultado:
+                icon_x = feedback_x + sum(fonte_fb.size(l)[0] for l in linhas_fb) + 18
+                icon_rect = pygame.Rect(icon_x, feedback_y, 24, 24)
+                pygame.draw.circle(tela, (100, 180, 255), icon_rect.center, 12)
+                i_mark = self.fonte_pequena.render("i", True, (30, 50, 80))
+                tela.blit(i_mark, (icon_rect.x + 6, icon_rect.y + 2))
+                self.rect_info_saida = icon_rect
+            else:
+                self.rect_info_saida = None
 
-                # --- Blocos disponíveis (ESQUERDA) ---
-                for i, (bloco, _) in enumerate(self.blocos_disponiveis):
-                    rect = pygame.Rect(prompt.x + 40, y + 30 + i*bloco_altura, int(prompt.w*0.48), bloco_altura-5)
-                    pygame.draw.rect(tela, (40, 120, 255), rect)
-                    pygame.draw.rect(tela, (30, 40, 90), rect, 2)
+            if self.rect_info_saida and self.rect_info_saida.collidepoint(pygame.mouse.get_pos()):
+                texto_ajuda = "Ver saída do seu código"
+                largura_balao = self.fonte_pequena.size(texto_ajuda)[0] + 24
+                altura_balao = 32
+                mx, my = pygame.mouse.get_pos()
+                surf = pygame.Surface((largura_balao, altura_balao), pygame.SRCALPHA)
+                pygame.draw.rect(surf, (40,60,110, 220), (0,0,largura_balao,altura_balao), border_radius=8)
+                pygame.draw.rect(surf, (110,190,255), (0,0,largura_balao,altura_balao), 2, border_radius=8)
+                tip = self.fonte_pequena.render(texto_ajuda, True, (255,255,255))
+                surf.blit(tip, (12,8))
+                tela.blit(surf, (mx-largura_balao//2, my-altura_balao-6))
 
-                    # PRESERVA indentação: converte TABs para 4 espaços e NÃO usa quebrar_texto
-                    texto = (bloco or "").replace("\t", "    ")
-                    # se por acaso vier com quebras de linha do DB, transforma em espaço simples
-                    texto = texto.replace("\r\n", " ").replace("\n", " ")
-
-                    fonte_b = self.fonte_pequena
-                    # reduz fonte até caber na largura do bloco (sem perder espaços iniciais)
-                    while fonte_b.size(texto)[0] > rect.w - 12 and fonte_b.get_height() > 12:
-                        fonte_b = pygame.font.SysFont('Consolas', fonte_b.get_height() - 1)
-
-                    tela.blit(fonte_b.render(texto, True, (255,255,255)), (rect.x + 5, rect.y + 5))
-
-                    # atualiza o rect no array (necessário pro drag/click)
-                    self.blocos_disponiveis[i] = (bloco, rect)
-
-                # Título da coluna direita
-                fonte_bloco2, _ = self.ajustar_fonte_para_caber(
-                    "Sua resposta:", self.fonte_pequena, int(prompt.w*0.43)-16, 30
-                )
-                tela.blit(fonte_bloco2.render("Sua resposta:", True, (120,255,120)), (prompt.x + int(prompt.w*0.55), y))
-
-                # --- Blocos resposta (DIREITA) ---
-                for i, (bloco, _) in enumerate(self.blocos_resposta):
-                    rect = pygame.Rect(prompt.x + int(prompt.w*0.55), y + 30 + i*bloco_altura, int(prompt.w*0.43), bloco_altura-5)
-                    pygame.draw.rect(tela, (80, 210, 80), rect)
-                    pygame.draw.rect(tela, (30, 60, 30), rect, 2)
-
-                    texto = (bloco or "").replace("\t", "    ")
-                    texto = texto.replace("\r\n", " ").replace("\n", " ")
-
-                    fonte_b = self.fonte_pequena
-                    while fonte_b.size(texto)[0] > rect.w - 12 and fonte_b.get_height() > 12:
-                        fonte_b = pygame.font.SysFont('Consolas', fonte_b.get_height() - 1)
-
-                    tela.blit(fonte_b.render(texto, True, (255,255,255)), (rect.x + 5, rect.y + 5))
-
-                    self.blocos_resposta[i] = (bloco, rect)
-
-                # espaço total ocupado verticalmente por essa seção
-                y += 30 + max(len(self.blocos_disponiveis), len(self.blocos_resposta)) * bloco_altura
-
-
-            # --- Botão ENVIAR/CONTINUAR
-            self.rect_btn = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
-            cor_btn = (0, 180, 80) if not self.feedback_ativo and self.pode_enviar() else (0, 150, 200) if self.feedback_ativo else (80, 80, 80)
-            pygame.draw.rect(tela, cor_btn, self.rect_btn, border_radius=24)
-            label_btn = "ENVIAR" if not self.feedback_ativo else "CONTINUAR"
-            fonte_btn, linhas_btn = self.ajustar_fonte_para_caber(label_btn, self.fonte_pequena, btn_w-10, btn_h-10)
-            y_btn = self.rect_btn.y + (btn_h - sum(fonte_btn.get_height() for _ in linhas_btn)) // 2
-            for l_btn in linhas_btn:
-                tela.blit(fonte_btn.render(l_btn, True, (255,255,255)), (self.rect_btn.x + (btn_w - fonte_btn.size(l_btn)[0]) // 2, y_btn))
-                y_btn += fonte_btn.get_height()
-
-            # --- Feedback
-            if self.resultado:
-                cor = (0, 255, 0) if "Correta" in self.resultado else (255, 0, 0)
-                feedback_x = self.rect_btn.right + 30
-                feedback_y = self.rect_btn.y + self.rect_btn.height // 2 - self.fonte_pequena.get_height() // 2 - 8
-                msg_curta = "Resposta Correta!" if "Correta" in self.resultado else "Resposta Incorreta!"
-                fonte_fb, linhas_fb = self.ajustar_fonte_para_caber(
-                    msg_curta, self.fonte_pequena, 220, self.rect_btn.h-2
-                )
-                y_fb = feedback_y
-                for l_fb in linhas_fb:
-                    tela.blit(fonte_fb.render(l_fb, True, cor), (feedback_x, y_fb))
-                    y_fb += fonte_fb.get_height()
-                if "Saída:" in self.resultado:
-                    icon_x = feedback_x + sum(fonte_fb.size(l)[0] for l in linhas_fb) + 18
-                    icon_rect = pygame.Rect(icon_x, feedback_y, 24, 24)
-                    pygame.draw.circle(tela, (100, 180, 255), icon_rect.center, 12)
-                    i_mark = self.fonte_pequena.render("i", True, (30, 50, 80))
-                    tela.blit(i_mark, (icon_rect.x + 6, icon_rect.y + 2))
-                    self.rect_info_saida = icon_rect
-                else:
-                    self.rect_info_saida = None
-
-                if self.rect_info_saida and self.rect_info_saida.collidepoint(pygame.mouse.get_pos()):
-                    texto_ajuda = "Ver saída do seu código"
-                    largura_balao = self.fonte_pequena.size(texto_ajuda)[0] + 24
-                    altura_balao = 32
-                    mx, my = pygame.mouse.get_pos()
-                    surf = pygame.Surface((largura_balao, altura_balao), pygame.SRCALPHA)
-                    pygame.draw.rect(surf, (40,60,110, 220), (0,0,largura_balao,altura_balao), border_radius=8)
-                    pygame.draw.rect(surf, (110,190,255), (0,0,largura_balao,altura_balao), 2, border_radius=8)
-                    tip = self.fonte_pequena.render(texto_ajuda, True, (255,255,255))
-                    surf.blit(tip, (12,8))
-                    tela.blit(surf, (mx-largura_balao//2, my-altura_balao-6))
-
+        # --- Popup de saída (dissertativa)
         if self.popup_saida:
             largura, altura = 520, 350
             popup_x = self.largura // 2 - largura // 2
@@ -537,213 +367,131 @@ class TelaExercicio:
         else:
             self._popup_btn_rect = None
 
-    # ... restante da classe (pode manter igual ao seu original para eventos, pode_enviar, etc) ...
-    # Só foi trocado o método desenhar e incluída a função ajustar_fonte_para_caber.
-
-    # Mantenha o resto do seu código igual!
-
-
-
+    # --------------------- Envio/validação ---------------------
     def pode_enviar(self):
         if not self.exercicio_selecionado:
             return False
         tipo = self.exercicio_selecionado.get_tipo().lower()
         if tipo == "objetiva":
-            return self.alternativa_selecionada is not None
+            return self.view_objetiva.can_submit()
         elif tipo == "dragdrop":
-            resposta_certa = self.exercicio_selecionado.get_resposta_certa()
-            blocos_certos = [b.strip() for b in resposta_certa.split("|")]
-            return len(self.blocos_resposta) == len(blocos_certos)
+            return self.view_dragdrop.can_submit()
         else:
-            return len(self.get_codigo_usuario().strip()) > 0
+            return self.view_dissertativa.can_submit()
 
-    def ajustar_scroll_horizontal(self):
-        linha, coluna = self.cursor_pos
-        texto = self.input_text[linha]
-        fonte = self.fonte_editor
-        prompt = self.rect_prompt
-        largura_caixa = prompt.w - 80 - 30
-        texto_visivel = texto[self.scroll_offset_x:coluna]
-        px_cursor = fonte.size(texto_visivel)[0]
-        while px_cursor > largura_caixa and self.scroll_offset_x < len(texto):
-            self.scroll_offset_x += 1
-            texto_visivel = texto[self.scroll_offset_x:coluna]
-            px_cursor = fonte.size(texto_visivel)[0]
-        while px_cursor < 0 and self.scroll_offset_x > 0:
-            self.scroll_offset_x -= 1
-            texto_visivel = texto[self.scroll_offset_x:coluna]
-            px_cursor = fonte.size(texto_visivel)[0]
+    def normaliza_saida(saida):
+        return ' '.join(saida.strip().split())
+    
+    def verificar_resposta(self):
+        if not self.exercicio_selecionado:
+            return False
+        tipo = self.exercicio_selecionado.get_tipo().lower()
 
+        if tipo == "objetiva":
+            resposta = self.view_objetiva.get_user_answer()
+            correta_txt = (self.exercicio_selecionado.get_resposta_certa() or "").strip().lower()
+            if resposta is None:
+                self.resultado = "Resposta Incorreta!"
+                return False
+            correta = (resposta.strip().lower() == correta_txt)
+            self.resultado = "Resposta Correta!" if correta else "Resposta Incorreta!"
+            return correta
 
+        elif tipo == "dragdrop":
+            resposta_user = self.view_dragdrop.get_user_answer()
+            resposta_certa = (self.exercicio_selecionado.get_resposta_certa() or "").replace("\r\n", "\n")
+            correta = (resposta_user.strip() == resposta_certa.strip())
+            self.resultado = "Resposta Correta!" if correta else "Resposta Incorreta!"
+            return correta
+
+        elif tipo == "dissertativa":
+            codigo_usuario = self.view_dissertativa.get_codigo_usuario()
+            entrada_teste = self.exercicio_selecionado.get_entrada_teste() or ""
+            saida_usuario = executar_codigo_piston(codigo_usuario, entrada_teste=entrada_teste)
+            resposta_certa = (self.exercicio_selecionado.get_resposta_certa() or "").strip()
+            if saida_usuario.strip() == resposta_certa:
+                valido, mensagem = self.exercicio_service.validar_codigo_ast_por_topico(codigo_usuario, self.id_fase)
+                if valido:
+                    self.resultado = f"Resposta Correta!\nSaída: {saida_usuario}"
+                    return True
+                else:
+                    self.resultado = f"Resposta Incorreta!\nSaída: {saida_usuario}\n{mensagem}"
+                    return False
+            else:
+                self.resultado = f"Resposta Incorreta!\nSaída: {saida_usuario}"
+        return False
+
+    # --------------------- Eventos ---------------------
     def tratar_eventos(self, eventos):
         if not self.prompt_visivel:
             return
-        # --- TRAVA TUDO enquanto popup ativo ---
+
+        # TRAVA enquanto popup ativo
         if self.popup_saida:
             for evento in eventos:
                 if self._popup_btn_rect and evento.type == pygame.MOUSEBUTTONDOWN:
                     if self._popup_btn_rect.collidepoint(evento.pos):
                         self.popup_saida = False
-            return  # NÃO processa mais nada se popup ativo
+            return
         
         for evento in eventos:
             if hasattr(self, "rect_info_saida") and self.rect_info_saida:
                 if evento.type == pygame.MOUSEBUTTONDOWN:
                     if self.rect_info_saida.collidepoint(evento.pos):
-                        self.popup_saida = True  # Ativa o popup
+                        self.popup_saida = True
             if hasattr(self, "_popup_btn_rect") and self._popup_btn_rect:
                 if evento.type == pygame.MOUSEBUTTONDOWN:
                     if self._popup_btn_rect.collidepoint(evento.pos):
                         self.popup_saida = False
 
-            # Início do drag
+            # Drag da moldura
             if self.prompt_visivel and evento.type == pygame.MOUSEBUTTONDOWN:
-                if evento.button == 1:  # Botão esquerdo
-                    # Detecta clique na barra do topo do prompt
-                    header_h = 50  # igual ao usado no desenhar
+                if evento.button == 1:
+                    header_h = 50
                     prompt = self.rect_prompt
                     header_rect = pygame.Rect(prompt.x, prompt.y, prompt.w, header_h)
                     if header_rect.collidepoint(evento.pos):
                         self.dragging = True
                         mx, my = evento.pos
                         self.drag_offset = (mx - prompt.x, my - prompt.y)
-            # Durante o drag
             elif evento.type == pygame.MOUSEMOTION:
                 if self.dragging:
                     mx, my = evento.pos
                     dx, dy = self.drag_offset
                     self.rect_prompt.x = mx - dx
                     self.rect_prompt.y = my - dy
-            # Fim do drag
             elif evento.type == pygame.MOUSEBUTTONUP:
                 if evento.button == 1 and self.dragging:
                     self.dragging = False
 
-            # Detectar X no prompt
+            # X fechar
             if self.prompt_visivel and hasattr(self, "rect_x") and evento.type == pygame.MOUSEBUTTONDOWN:
                 if self.rect_x and self.rect_x.collidepoint(evento.pos):
                     self.dragging = False
-                    #self.input_ativo = False
                     self.prompt_visivel = False
                     return
 
-            # Resto igual ao seu código original
-            if self.exercicio_selecionado and self.exercicio_selecionado.get_tipo().lower() == "dragdrop":
-                if evento.type == pygame.MOUSEBUTTONDOWN:
-                    x, y = evento.pos
-                    for i, (bloco, rect) in enumerate(self.blocos_disponiveis):
-                        if rect and rect.collidepoint(x, y) and not self.feedback_ativo:
-                            self.blocos_resposta.append((bloco, None))
-                            self.blocos_disponiveis.pop(i)
-                            break
-                    for i, (bloco, rect) in enumerate(self.blocos_resposta):
-                        if rect and rect.collidepoint(x, y) and not self.feedback_ativo:
-                            self.blocos_disponiveis.append((bloco, None))
-                            self.blocos_resposta.pop(i)
-                            break
+            # Delegação por tipo
             tipo = self.exercicio_selecionado.get_tipo().lower() if self.exercicio_selecionado else ""
-            if tipo == "dissertativa":
-                if evento.type == pygame.MOUSEBUTTONDOWN:
-                    x, y = evento.pos
-                    # Calcule o mesmo y que está no desenhar
-                    header_h = 50
-                    usuario_surface = self.fonte_pequena.render(f"Usuário logado: {self.nome_jogador}", True, (230, 230, 90))
-                    y_usuario = self.rect_prompt.y + header_h + 6 + usuario_surface.get_height() + 4
-                    y_barras = y_usuario + 10  # +10 igual ao desenhar
 
-                    BAR_HEIGHT = 28
-                    bar2_rect_y = y_barras + 42  # segunda barra
-                    bar2_rect_h = BAR_HEIGHT
+            if tipo == "dragdrop":
+                self.view_dragdrop.handle_event(evento, feedback_ativo=self.feedback_ativo)
 
-                    y = bar2_rect_y + bar2_rect_h + 24  # igual desenhar
+            elif tipo == "dissertativa":
+                self.view_dissertativa.handle_event(evento, feedback_ativo=self.feedback_ativo)
 
-                    caixa = pygame.Rect(self.rect_prompt.x+40, y, self.rect_prompt.w-80, max(len(self.input_text),5)*self.fonte_editor.get_height()+16)
+            elif tipo == "objetiva":
+                self.view_objetiva.handle_event(evento, feedback_ativo=self.feedback_ativo)
 
-                    if caixa.collidepoint(x, y) and not self.feedback_ativo:
-                        self.input_ativo = True
-                        linha_clicada = (y - caixa.y) // self.fonte_editor.get_height() + self.scroll_offset
-                        if 0 <= linha_clicada < len(self.input_text):
-                            texto = self.input_text[linha_clicada]
-                            col = 0
-                            for i in range(len(texto)+1):
-                                largura = self.fonte_editor.size(texto[:i])[0]
-                                if caixa.x+18 + largura > x:
-                                    break
-                                col = i
-                            self.cursor_pos = [linha_clicada, col]
-                if evento.type == pygame.MOUSEWHEEL and self.input_ativo:
-                    self.scroll_offset -= evento.y
-                    self.scroll_offset = self.clamp(self.scroll_offset, 0, max(0, len(self.input_text) - self.linhas_visiveis))
-                if evento.type == pygame.KEYDOWN and self.input_ativo and not self.feedback_ativo:
-                    linha, coluna = self.cursor_pos
-                    if evento.key == pygame.K_RETURN:
-                        self.input_text.insert(linha + 1, self.input_text[linha][coluna:])
-                        self.input_text[linha] = self.input_text[linha][:coluna]
-                        linha += 1
-                        coluna = 0
-                        self.scroll_offset_x = 0
-                    elif evento.key == pygame.K_BACKSPACE:
-                        if coluna > 0:
-                            self.input_text[linha] = self.input_text[linha][:coluna-1] + self.input_text[linha][coluna:]
-                            coluna -= 1
-                        elif linha > 0:
-                            coluna = len(self.input_text[linha-1])
-                            self.input_text[linha-1] += self.input_text[linha]
-                            self.input_text.pop(linha)
-                            linha -= 1
-                            self.scroll_offset_x = 0
-                    elif evento.key == pygame.K_TAB:
-                        self.input_text[linha] = self.input_text[linha][:coluna] + "    " + self.input_text[linha][coluna:]
-                        coluna += 4
-                    elif evento.key == pygame.K_LEFT:
-                        if coluna > 0:
-                            coluna -= 1
-                        elif linha > 0:
-                            linha -= 1
-                            coluna = len(self.input_text[linha])
-                    elif evento.key == pygame.K_RIGHT:
-                        if coluna < len(self.input_text[linha]):
-                            coluna += 1
-                        elif linha < len(self.input_text) - 1:
-                            linha += 1
-                            coluna = 0
-                    elif evento.key == pygame.K_UP:
-                        if linha > 0:
-                            linha -= 1
-                            coluna = min(coluna, len(self.input_text[linha]))
-                            self.scroll_offset_x = 0
-                    elif evento.key == pygame.K_DOWN:
-                        if linha < len(self.input_text)-1:
-                            linha += 1
-                            coluna = min(coluna, len(self.input_text[linha]))
-                            self.scroll_offset_x = 0
-                    else:
-                        if evento.unicode.isprintable():
-                            self.input_text[linha] = self.input_text[linha][:coluna] + evento.unicode + self.input_text[linha][coluna:]
-                            coluna += 1
-                    linha = self.clamp(linha, 0, len(self.input_text)-1)
-                    coluna = self.clamp(coluna, 0, len(self.input_text[linha]))
-                    self.cursor_pos = [linha, coluna]
-                    self.ajustar_scroll_horizontal()
-                    if self.cursor_pos[0] < self.scroll_offset:
-                        self.scroll_offset = self.cursor_pos[0]
-                    elif self.cursor_pos[0] >= self.scroll_offset + self.linhas_visiveis:
-                        self.scroll_offset = self.cursor_pos[0] - self.linhas_visiveis + 1
-                    self.scroll_offset = self.clamp(self.scroll_offset, 0, max(0, len(self.input_text) - self.linhas_visiveis))
-
+            # "?" introdução
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 x, y = evento.pos
-                # Novo: "?" chama introdução
                 if self.rect_q and self.rect_q.collidepoint(x, y):
                     if self.callback_rever_introducao:
                         self.callback_rever_introducao(self)
-                    
                     return
-                if self.exercicio_selecionado and self.exercicio_selecionado.get_tipo().lower() == "objetiva":
-                    if hasattr(self, "rect_alternativas"):
-                        for rect, alt, idx in self.rect_alternativas:
-                            if rect.collidepoint(x, y) and not self.feedback_ativo:
-                                self.alternativa_selecionada = idx
+
+                # Botão ENVIAR/CONTINUAR
                 if self.exercicio_selecionado and self.rect_btn and self.rect_btn.collidepoint(x, y):
                     if not self.feedback_ativo and self.pode_enviar():
                         self.feedback_ativo = True
@@ -753,6 +501,7 @@ class TelaExercicio:
                         else:
                             self.erros += 1
                     elif self.feedback_ativo:
+                        # Avança
                         self.indice_atual += 1
                         self.progresso_service.salvar_ou_atualizar_progresso(
                             jogador=self.jogador,
@@ -766,56 +515,19 @@ class TelaExercicio:
                             self.exercicio_selecionado = self.exercicios[self.indice_atual]
                             self.feedback_ativo = False
                             self.resultado = ""
-                            self.alternativa_selecionada = None
-                            self.input_text = [""]
-                            self.cursor_pos = [0, 0]
-                            self.scroll_offset = 0
-                            self.blocos_disponiveis = []
-                            self.blocos_resposta = []
+                            # Reset por tipo
+                            t = self.exercicio_selecionado.get_tipo().lower()
+                            if t == "objetiva":
+                                self.view_objetiva.set_exercicio(self.exercicio_selecionado)
+                                self.view_dragdrop.reset()
+                                self.view_dissertativa.reset()
+                            elif t == "dragdrop":
+                                self.view_dragdrop.set_exercicio(self.exercicio_selecionado)
+                                self.view_objetiva.reset()
+                                self.view_dissertativa.reset()
+                            else:
+                                self.view_dissertativa.set_exercicio(self.exercicio_selecionado)
+                                self.view_objetiva.reset()
+                                self.view_dragdrop.reset()
                         else:
                             self.finalizado = True
-
-    
-    
-    def normaliza_saida(saida):
-        return ' '.join(saida.strip().split())
-    
-    def verificar_resposta(self):
-        if not self.exercicio_selecionado:
-            return False
-        tipo = self.exercicio_selecionado.get_tipo().lower()
-        if tipo == "objetiva":
-            alternativas = [self.exercicio_selecionado.get_resposta_certa()] + self.exercicio_selecionado.get_resposta_erradas()
-            random.seed(self.exercicio_selecionado.get_id_exercicio())
-            random.shuffle(alternativas)
-            if self.alternativa_selecionada is not None:
-                resposta = alternativas[self.alternativa_selecionada]
-                correta = (resposta.strip().lower() == self.exercicio_selecionado.get_resposta_certa().strip().lower())
-                self.resultado = "Resposta Correta!" if correta else "Resposta Incorreta!"
-                return correta
-        elif tipo == "dragdrop":
-            resposta_user = "|".join([b[0] for b in self.blocos_resposta])
-            resposta_certa = self.exercicio_selecionado.get_resposta_certa().replace("\r\n", "\n")
-            correta = resposta_user.strip() == resposta_certa.strip()
-            self.resultado = "Resposta Correta!" if correta else "Resposta Incorreta!"
-            return correta
-        elif tipo == "dissertativa":
-            codigo_usuario = self.get_codigo_usuario()
-            entrada_teste = self.exercicio_selecionado.get_entrada_teste() or ""
-            
-            saida_usuario = executar_codigo_piston(codigo_usuario, entrada_teste=entrada_teste)
-            #saida_usuario = self.executar_codigo_piston(codigo_usuario, entrada_teste=entrada_teste)
-            resposta_certa = self.exercicio_selecionado.get_resposta_certa().strip()
-            if saida_usuario.strip() == resposta_certa:
-                # Só valida o AST se a saída está certa!
-                valido, mensagem = self.exercicio_service.validar_codigo_ast_por_topico(codigo_usuario, self.id_fase)
-
-                if valido:
-                    self.resultado = f"Resposta Correta!\nSaída: {saida_usuario}"
-                    return True
-                else:
-                    self.resultado = f"Resposta Incorreta!\nSaída: {saida_usuario}\n{mensagem}"
-                    return False
-            else:
-                self.resultado = f"Resposta Incorreta!\nSaída: {saida_usuario}"
-        return False

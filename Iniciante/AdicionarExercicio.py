@@ -10,10 +10,10 @@ exercicios = [
         resposta_erradas="show()|output()|display()"),
 
     Exercicio(id_exercicio=None, id_fase=1,
-        dicas="Lembre do comando para separar valores.",
-        pergunta="Como exibir os valores de x e y, separados por espaço?",
-        tipo="objetiva", resposta_certa="print(x, y)",
-        resposta_erradas="print(x + y)|show(x, y)|display(x, y)"),
+        dicas="O print pode fazer cálculos matemáticos automaticamente.",
+        pergunta="Como exibir o resultado de 5 + 3?",
+        tipo="objetiva", resposta_certa="print(5 + 3)",
+        resposta_erradas="print(\"5 + 3\")|print(5,+,3)|print(8)"),
 
     Exercicio(id_exercicio=None, id_fase=1,
         dicas="Use o comando print para mostrar a mensagem.",
@@ -28,10 +28,10 @@ exercicios = [
         resposta_erradas=None),
 
     Exercicio(id_exercicio=None, id_fase=1,
-        dicas="Arraste os blocos para montar o comando correto.",
-        pergunta="Drag&Drop: Monte o comando para exibir 'Python é legal!' na tela.",
-        tipo="dragdrop", resposta_certa='print("Python é legal!")',
-        resposta_erradas='print("Python legal!")|print(Python é legal!)|show("Python é legal!")'),
+        dicas="Arraste dois prints: um com texto e outro com cálculo.",
+        pergunta="Drag&Drop: Monte para exibir 'Total:' e depois 10 + 2",
+        tipo="dragdrop", resposta_certa='print("Total:")|print(10 + 2)',
+        resposta_erradas='print("Total: 12)|printf("Total:", 10 + 2)|show("Total:"); show(10 + 2)'),
 
     Exercicio(id_exercicio=None, id_fase=1,
         dicas="Monte um print que some dois valores.",

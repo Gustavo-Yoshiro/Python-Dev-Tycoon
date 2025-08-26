@@ -13,7 +13,20 @@ from Iniciante.Service.Impl.ProgressoFaseServiceImpl import ProgressoFaseService
 from Iniciante.Service.Impl.ExercicioServiceImpl import ExercicioServiceImpl
 from Intermediario.UI.TelaLoja import TelaLoja
 from Intermediario.Service.Impl.LojaServiceImpl import LojaServiceImpl
-from Iniciante.UI.TelaMiniPythonHero import TelaMiniPythonHero
+from Intermediario.UI.TelaMiniPythonHero import TelaMiniPythonHero
+from Intermediario.UI.TelaCobraCodigo import TelaCobraCodigo
+from Intermediario.UI.TelaEscolhaMiniGame import TelaEscolhaMiniGame
+from Intermediario.UI.TelaBugSquashArcade import TelaBugSquashArcade
+from Intermediario.UI.TelaPyFootTactics import TelaPyFootTactics
+
+#audio minigames
+from Intermediario.Utils.audio_core import AudioEngine
+from Intermediario.Utils.sfx_pyfoot import SFXPyFoot
+from Intermediario.Utils.sfx_bug import SFXBug
+from Intermediario.Utils.sfx_cobra import SFXCobra
+from Intermediario.Utils.sfx_hero import SFXHero
+
+
 
 
 
@@ -38,7 +51,13 @@ class GameManager:
         self.tela_minigame = None
         self._ultimo_resultado_ok = False
         self._resultado_pendente = None
-        self.MINIGAME_PASS_SCORE = 250
+        self.MINIGAME_PASS_SCORE = 360
+        self.tela_minigame = None
+        self.tela_escolha_mg = None
+
+        
+        self.audio = AudioEngine()   # motor único
+        self.sfx = None 
 
         # bônus acumulado pelas estrelas do Iniciante (fases 1..8)
         self.bonus_backend_iniciante = 0
@@ -264,22 +283,26 @@ class GameManager:
                 jogador=self.jogador_atual,
                 id_fase=self.id_fases[self.fase_atual]
             )
-            """
-            self.tela_exercicio = TelaExercicio(
-            self.largura,
-            self.altura,
-            self.nome_topico_atual,
-            total_fases=len(self.id_fases),
-            fases_concluidas=self.fase_atual,
-            callback_rever_introducao=self.mostrar_introducao,
-            jogador=self.jogador_atual,
-            id_fase=self.id_fases[self.fase_atual]
-        )
-        """
+        
         # NÃO CHAME self.tela_exercicio.carregar_exercicios AQUI!
 
         self.tela_atual = "exercicio"
 
+
+    def _on_bug_finish(self, result: dict):
+        # result esperado: {"score", "passed", "squashed", "misses", "hint_uses", "time_spent"}
+        score = int(result.get("score", 0))
+        # mapeia score -> estrelas (mantém tua mecânica de bônus)
+        if score >= int(self.MINIGAME_PASS_SCORE * 1.50):
+            stars = 3
+        elif score >= int(self.MINIGAME_PASS_SCORE * 1.15):
+            stars = 2
+        elif score >= self.MINIGAME_PASS_SCORE:
+            stars = 1
+        else:
+            stars = 0
+        # reusa teu fluxo padrão
+        self.finalizar_minigame(score, stars)
 
     def _pos_resultado(self):
         # Se foi aprovado e é Iniciante (fases 1..8), roda minigame
@@ -289,21 +312,101 @@ class GameManager:
         else:
             self.avancar_fase()
 
-    def iniciar_minigame(self):
+    def _gerar_seq_por_topico(self, topico):
+        t = (topico or "").lower()
+        if "print" in t:
+            return ["print('Olá')", "print('Boa tarde')"]
+        if "input" in t:
+            return ["n = int(input())", "print(n)"]
+        if "for" in t:
+            return ["for i in range(3):", "print(i)"]
+        if "if" in t:
+            return ["x = 5", "if x > 0:", "print('ok')"][:2]  # mantem 2 passos se preferir
+        return ["print('ok')", "print('fim')"]
+
+
+    def _iniciar_minigame_escolhido(self, tipo):
         id_fase = self.id_fases[self.fase_atual]
-        # pega o nome do tópico que você já salvou em self.nome_topico_atual
-        self.tela_minigame = TelaMiniPythonHero(
-            largura=self.largura,
-            altura=self.altura,
-            jogador=self.jogador_atual,
-            id_fase=id_fase,
-            nome_topico=self.nome_topico_atual,
-            on_finish=self.finalizar_minigame
-        )
+
+        # sempre derruba qualquer ambient anterior
+        if self.audio:
+            self.audio.stop_ambient()
+
+        # zera e cria o wrapper correto
+        self.sfx = None
+
+        if tipo == "cobra":
+            self.sfx = SFXCobra(self.audio)
+            seq_alvo = self._gerar_seq_por_topico(self.nome_topico_atual)
+            self.tela_minigame = TelaCobraCodigo(
+                largura=self.largura,
+                altura=self.altura,
+                jogador=self.jogador_atual,
+                id_fase=id_fase,
+                nome_topico=self.nome_topico_atual,
+                on_finish=self.finalizar_minigame,
+                sequencia_alvo=seq_alvo,
+                sfx=self.sfx
+            )
+
+        elif tipo == "bug":
+            self.sfx = SFXBug(self.audio)   # <<— SFX DO BUG É ESSE
+            self.tela_minigame = TelaBugSquashArcade(
+                largura=self.largura,
+                altura=self.altura,
+                topic_title=self.nome_topico_atual,
+                on_finish=self._on_bug_finish,      # recebe dict e mapeia para estrelas
+                pass_score=self.MINIGAME_PASS_SCORE,
+                round_seconds=35,
+                sfx=self.sfx
+            )
+
+        elif tipo == "pyfoot":
+            self.sfx = SFXPyFoot(self.audio)
+            self.tela_minigame = TelaPyFootTactics(
+                largura=self.largura,
+                altura=self.altura,
+                topic_title=self.nome_topico_atual,
+                on_finish=self._on_bug_finish,      # também retorna dict
+                pass_score=self.MINIGAME_PASS_SCORE,
+                total_seconds=45,
+                rounds=14,
+                sfx=self.sfx
+            )
+            # torcida SÓ aqui
+            self.sfx.start_ambient(vol=0.45)
+
+        else:  # "hero"
+            self.sfx = SFXHero(self.audio)
+            self.sfx.start_ambient(vol=0.48)
+            self.tela_minigame = TelaMiniPythonHero(
+                largura=self.largura,
+                altura=self.altura,
+                jogador=self.jogador_atual,
+                id_fase=id_fase,
+                nome_topico=self.nome_topico_atual,
+                on_finish=self.finalizar_minigame,
+                sfx=self.sfx
+            )
+
         self.tela_atual = "minigame"
+
+
+    def iniciar_minigame(self):
+        # Abre hub de escolha; quando escolher, chamamos _iniciar_minigame_escolhido(...)
+        self.tela_escolha_mg = TelaEscolhaMiniGame(
+            self.largura,
+            self.altura,
+            on_choose=self._iniciar_minigame_escolhido
+        )
+        self.tela_atual = "escolha_mg"
+
 
     def finalizar_minigame(self, score, stars):
         # bônus por estrelas (mantém)
+        if self.audio: 
+            self.audio.stop_ambient()
+        self.sfx = None
         self.bonus_backend_iniciante += {0:0, 1:1, 2:2, 3:3}[int(stars)]
 
         # --- NOVO: contar e PERSISTIR o minigame como 5ª questão ---
@@ -590,6 +693,11 @@ class GameManager:
                 self.tela_criar_jogador.tratar_eventos(eventos)
                 self.tela_criar_jogador.atualizar(dt)
                 self.tela_criar_jogador.desenhar(self.tela)
+            elif self.tela_atual == "escolha_mg":
+                self.tela.blit(self.fundo_principal, (0, 0))
+                self.tela_escolha_mg.tratar_eventos(eventos)
+                self.tela_escolha_mg.desenhar(self.tela)
+
 
             elif self.tela_atual in ["introducao", "exercicio", "resultado"]:
                 # fundo
@@ -758,5 +866,16 @@ class GameManager:
 
 
             pygame.display.flip()
+
+        # ao sair do loop principal
+        try:
+            if getattr(self, "sfx", None):
+                # wrappers não precisam fechar nada
+                pass
+            if getattr(self, "audio", None):
+                self.audio.stop_ambient()
+                self.audio.close()
+        except Exception:
+            pass
 
         pygame.quit()

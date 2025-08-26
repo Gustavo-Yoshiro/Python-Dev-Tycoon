@@ -1,20 +1,30 @@
 import pygame
 import random
+import re
 
 class TelaMiniPythonHero:
     """
-    Minigame (45s). 4 trilhas (A,S,D,F). Uma pergunta por rodada.
+    Minigame (35s). 4 trilhas (A,S,D,F). Uma pergunta por rodada.
     Uma rodada = até 4 blocos (1 correta + erradas). Próxima rodada só começa
     quando a atual termina. Blocos são NEUTROS; a cor aparece só ao apertar.
+
+    Render dos cards:
+    - NÃO faz word-wrap.
+    - Quebra em '\\n' / ' | ' vindos do content.
+    - **Auto-format**: também quebra em ';' e em blocos 'for/if/elif/else/while/def/try/except'
+      no padrão "cabecalho: \\n    corpo".
+    - Diminui a fonte até caber (mín. 12).
+    - Se ainda assim não couber, põe '…' no fim e loga um aviso no console.
     """
 
-    def __init__(self, largura, altura, jogador, id_fase, nome_topico, on_finish):
+    def __init__(self, largura, altura, jogador, id_fase, nome_topico, on_finish,sfx=None):
         self.largura = largura
         self.altura = altura
         self.jogador = jogador
         self.id_fase = id_fase
         self.nome_topico = (nome_topico or "").lower()
         self.on_finish = on_finish
+        self.sfx = sfx
 
         # painel
         self.prompt = pygame.Rect(int(largura*0.18), int(altura*0.10), int(largura*0.64), int(altura*0.76))
@@ -24,22 +34,29 @@ class TelaMiniPythonHero:
         self.fonte_t  = pygame.font.SysFont("Consolas", 18)
         self.fonte_fx = pygame.font.SysFont("Consolas", 26, bold=True)
 
+        # Fonte/estilo dos cards
+        self.note_font_base_size = 18
+        self.note_font_min_size  = 12
+        self.note_pad_x = 6
+        self.note_pad_y = 6
+        self.note_corner = 10
+        self.note_line_gap = 2
+        self.max_note_lines = 3   # ← se quiser apenas 2 linhas, troque para 2
+
         # trilhas
         self.num_lanes = 4
         m = 36
         lane_w = (self.prompt.w - m*2) // self.num_lanes
         self.lanes = [pygame.Rect(self.prompt.x + m + i*lane_w, self.prompt.y+140, lane_w-10, self.prompt.h-200) for i in range(self.num_lanes)]
         self.hit_y = self.lanes[0].bottom - 48
-        self.hit_window = 100  # janela generosa
+        self.hit_window = 100
+        self.early_window = 220
 
         # notas
         self.notes = []
         self.last_spawn = 0
-        ###
-        self.hit_window = 100  # janela generosa
-        self.early_window = 220  # NOVO: janela de adiantado (px) acima da hitline
 
-        # ritmo/velocidade (calmo)
+        # ritmo/velocidade
         self.base_speed = 100
         self.base_beat  = 1200
         self.speed = self.base_speed
@@ -67,18 +84,29 @@ class TelaMiniPythonHero:
         # 1 tentativa por rodada
         self.wave_answered = False
 
-        # perguntas (somente do tópico atual; fallback p/ base)
+        # perguntas por tópico
         self.pool = self._criar_pool_por_topico(self.nome_topico)
         self.current_prompt = None
-        self._prepare_next_prompt()  # prepara primeira rodada
+        self._prepare_next_prompt()  # primeira rodada
         self._last_tick = now
         self.fx = []
 
-        # solta a primeira rodada de cara
+        # solta a primeira rodada
         self._spawn_notes()
         self.last_spawn = now
 
-    # ---------- CONTEÚDO ----------
+    def _SFX(self, name, *a, **kw):
+        s = getattr(self, "sfx", None)
+        if not s: 
+            return
+        fn = getattr(s, name, None)
+        if callable(fn):
+            try:
+                fn(*a, **kw)
+            except Exception:
+                pass
+
+    # ---------- CONTEÚDO (fallback simples) ----------
     def _criar_pool_por_topico(self, topico):
         def p(prompt, ok, *wrong):
             alts = [{"txt": ok, "ok": True}] + [{"txt": w, "ok": False} for w in wrong]
@@ -87,59 +115,27 @@ class TelaMiniPythonHero:
         base = [
             p("Qual imprime 7?", "print(3+4)", "print(3*4)", "print('7'+1)", "print(7,)"),
             p("Qual concatena 'py' e 'thon'?", "print('py'+'thon')", "print('py','thon')", "print( py + thon )", "print('py'.join('thon'))"),
-            p("Qual imprime de 0 a 2 (um por linha)?", "for i in range(3): print(i)", "for i in range(1,3): print(i)", "for i in [3]: print(i)", "print(range(3))"),
+            p("Qual imprime de 0 a 2 (um por linha)?",
+              "for i in range(3): print(i)",
+              "for i in range(1,3): print(i)", "for i in [3]: print(i)", "print(range(3))"),
         ]
 
-        # listas específicas por tópico
         topic_only = []
         if "print" in topico:
             topic_only = [
-                # 1) iguais à sua referência
                 p("Imprimir exatamente: Hello",
-                "print('Hello')",
-                "print(Hello)", "print(\"Hello)", "print('Hello'"),
-
-                # 2) número puro
-                p("Imprimir exatamente: 7",
-                "print(7)",
-                "print('7'+1)", "print(3*4)", "print(7.0)"),
-
-                # 4) apóstrofo dentro do texto
-                p("Imprimir exatamente: I'm ok",
-                "print(\"I'm ok\")",
-                "print('Im ok')", "print(\"I'm ok)", "print(I'm ok)"),
-
-                # 5) aspas duplas dentro do texto
-                p("Imprimir exatamente: He said \"hi\"",
-                "print('He said \"hi\"')",
-                "print(\"He said 'hi'\")", "print(He said \"hi\")", "print('He said \"hi')"),
-
-                # 6) clássico
-                p("Imprimir exatamente: Hello, World!",
-                "print('Hello, World!')",
-                "print(\"Hello, World!)", "print(Hello, World!)", "print('Hello,' 'World')"),
-            ]
-        elif "input" in topico:
-            topic_only = [
-                p("Ler uma linha do usuário em s", "s = input()", "s = input", "s = input(str)", "input() = s"),
-                p("Ler número inteiro", "n = int(input())", "n = input(int())", "n = int(input)", "int = input()"),
-                p("Ler e depois imprimir", "s=input(); print(s)", "print(input)", "s=print(input())", "input(print(s))"),
-                p("Ler dois inputs separados", "a = input(); b = input()", "a, b = input()", "input(); input() = a, b", "a = b = input()"),
-                p("Ler e imprimir direto", "print(input())", "input(print())", "print = input()", "input(); print()"),
-                p("Ler nome e cumprimentar", "nome = input(); print('Olá', nome)", "input(print('Olá'))", "nome = print(input())", "print('Olá', input())")
+                  "print('Hello')",
+                  "print(Hello)", "print(\"Hello)", "print('Hello'"),
+                p("Imprimir duas linhas",
+                  "print('Bom dia'); print('Boa tarde')",
+                  "print('Bom dia' 'Boa tarde')", "prit('Bom dia'); prit('Boa tarde')", "print('Bom dia', 'Boa tarde'')"),
             ]
         elif "for" in topico:
             topic_only = [
-                p("Imprimir 0..4", "for i in range(5): print(i)", "for i in range(1,5): print(i)", "for i in 5: print(i)", "print(range(5))"),
-                p("Somar 0..2 em s", "s=0\nfor i in range(3): s+=i\nprint(s)", "s=0\nfor i in range(3): s=s+i\nprint(i)", "for i in range(3): s+=i; print(s)", "s=0; for i in range(3): s+=i"),
-                p("Loop sobre lista a", "a=[1,2];\nfor x in a: print(x)", "a=(1,2);\nfor x in a: print(a)", "for x in [a]: print(x)", "for x in a: print(a[x])"),
+                p("Imprimir 0..4",
+                  "for i in range(5): print(i)",
+                  "for i in range 5:\n    print(i)", "for(i in range(5)):\n    print(i)", "print(range(5))"),
             ]
-        elif "if" in topico:
-            topic_only = [
-                p("Imprimir 'ok' se x>0", "x=1\nif x>0:\n    print('ok')", "x=1\nif (x>0)\n    print('ok')", "x=1\nif x>0: print('ok'", "if x>0: print ok"),
-                p("if/else válido", "if True:\n    print(1)\nelse:\n    print(2)", "if True:\nprint(1)\nelse:\nprint(2)", "if True:\n    print(1)\nelse print(2)", "if True: print(1)\nelse:"),
-            ]
-
         return topic_only if topic_only else base
 
     # ---------- RODADA ----------
@@ -166,7 +162,10 @@ class TelaMiniPythonHero:
                 self._lane_alternativas.append({"txt":"...", "ok": False})
 
         self.total_correct_notes += 1
-        self.wave_answered = False  # libera tentativa para a nova rodada
+        self.wave_answered = False
+
+        # --- SFX: nova rodada/pergunta
+        self._SFX("wave_start", self.current_prompt)
 
     # ---------- CONTROLES ----------
     def tratar_eventos(self, eventos):
@@ -175,9 +174,8 @@ class TelaMiniPythonHero:
         for ev in eventos:
             if ev.type == pygame.KEYDOWN and ev.key in self.key_to_lane:
                 if self.wave_answered:
-                    # já tentou nessa rodada → ignora
                     continue
-                self.wave_answered = True  # trava a rodada ao primeiro input
+                self.wave_answered = True
                 self.pressed.add(ev.key)
                 lane = self.key_to_lane[ev.key]
                 self._try_hit(lane)
@@ -192,19 +190,17 @@ class TelaMiniPythonHero:
             self._register_miss()
             return
 
-        # nota mais perto da linha de acerto
         n = min(candidates, key=lambda x: abs(x["y"] - self.hit_y))
-        signed = n["y"] - self.hit_y   # <0 = acima (adiantado), >0 = abaixo (atrasado)
+        signed = n["y"] - self.hit_y
         dist   = abs(signed)
 
-        # ---------- DENTRO DA JANELA (acerto normal) ----------
         if dist <= self.hit_window:
             if n["correct"]:
                 self.hits += 1
                 self.combo += 1
                 self.best_combo = max(self.best_combo, self.combo)
 
-                precision = 1.0 - (dist / self.hit_window)  # 1.0 perfeito → 0 na borda
+                precision = 1.0 - (dist / self.hit_window)
                 base_pts = 100
                 self.score += int(base_pts * (1 + 0.25*precision) * (1 + 0.02*self.combo))
 
@@ -212,49 +208,57 @@ class TelaMiniPythonHero:
                 elif precision >= 0.5: tag = "GOOD"
                 else:                  tag = "LATE"
                 self._add_fx(tag, self.lanes[lane].centerx, self.hit_y-10)
-                self._flash_lane(lane, (70,200,70))   # verde
+                self._flash_lane(lane, (70,200,70))
+
+                # --- SFX: acerto + (opcional) combo
+                t = tag.replace("!", "").lower()  # "perfect"|"good"|"late"
+                self._SFX("hit", t)
+                if self.combo > 1:
+                    self._SFX("combo_up", int(self.combo))
             else:
                 self.misses += 1
                 self.combo = 0
                 self.score = max(0, self.score - 40)
                 self._add_fx("WRONG", self.lanes[lane].centerx, self.hit_y-10)
-                self._flash_lane(lane, (200,60,60))   # vermelho
+                self._flash_lane(lane, (200,60,60))
+                # --- SFX: erro na nota
+                self._SFX("wrong")
 
             self.notes.remove(n)
             return
 
-        # ---------- FORA DA JANELA, MAS ADIANTADO (EARLY) ----------
-        # permite clicar ANTES da linha dentro de um "early window" mais largo
         if signed < -self.hit_window and dist <= self.hit_window + self.early_window:
             if n["correct"]:
-                # quão perto da borda da janela (quanto mais perto, melhor)
-                early_offset = (-signed) - self.hit_window  # 0 na borda; cresce p/ cima
-                early_ratio  = 1.0 - (early_offset / self.early_window)  # 1.0 (quase bom) → 0 (bem cedo)
+                early_offset = (-signed) - self.hit_window
+                early_ratio  = 1.0 - (early_offset / self.early_window)
 
                 self.hits += 1
                 self.combo += 1
                 self.best_combo = max(self.best_combo, self.combo)
 
-                # pontuação menor que o acerto normal
-                # (base ~60, com bônus leve por proximidade e combo)
                 base_early = 60
                 self.score += int(base_early * (0.6 + 0.4*early_ratio) * (1 + 0.01*self.combo))
 
                 tag = "GOOD" if early_ratio >= 0.5 else "BAD"
                 self._add_fx(tag, self.lanes[lane].centerx, self.hit_y-10)
-                self._flash_lane(lane, (70,200,70))   # verde (acertou)
+                self._flash_lane(lane, (70,200,70))
+
+                # --- SFX: acerto antecipado
+                self._SFX("hit", "good" if early_ratio >= 0.5 else "bad")
+                if self.combo > 1:
+                    self._SFX("combo_up", int(self.combo))
             else:
-                # apertou cedo mas na errada -> erro normal
                 self.misses += 1
                 self.combo = 0
                 self.score = max(0, self.score - 40)
                 self._add_fx("WRONG", self.lanes[lane].centerx, self.hit_y-10)
-                self._flash_lane(lane, (200,60,60))   # vermelho
+                self._flash_lane(lane, (200,60,60))
+                # --- SFX: erro na nota
+                self._SFX("wrong")
 
             self.notes.remove(n)
             return
 
-        # ---------- MUITO CEDO (fora do early window) OU TARDIO FORA DA JANELA ----------
         self._flash_lane(lane, (200,60,60))
         self._register_miss()
 
@@ -266,17 +270,21 @@ class TelaMiniPythonHero:
         self.combo = 0
         self.score = max(0, self.score - 30)
         self._add_fx("MISS", (self.lanes[0].x + self.lanes[-1].right)//2, self.hit_y-10)
+        # --- SFX: miss genérico (sem nota/hit válido)
+        self._SFX("miss")
 
     # ---------- SPAWN / UPDATE ----------
     def _spawn_notes(self):
-        # cria blocos da rodada atual (não troca a pergunta aqui!)
         for lane_idx, alt in enumerate(self._lane_alternativas):
             self.notes.append({
                 "lane": lane_idx,
-                "y": self.lanes[lane_idx].y - 30,
+                "y": self.lanes[lane_idx].y - 30,  # centro do card
                 "text": alt["txt"],
                 "correct": bool(alt["ok"])
             })
+            # --- SFX: spawn de nota (1 por trilha)
+            self._SFX("spawn_note", int(lane_idx), bool(alt["ok"]))
+
 
     def _add_fx(self, txt, x, y):
         self.fx.append({"txt": txt, "x": x, "y": y, "alpha": 255, "dy": -28})
@@ -296,31 +304,31 @@ class TelaMiniPythonHero:
         dt = (now - self._last_tick) / 1000.0
         self._last_tick = now
 
-        # aceleração leve
         self.speed = self.base_speed + self.combo * 2
         self.beat_ms = max(900, self.base_beat - self.combo * 5)
 
-        # mover notas
         for n in self.notes[:]:
             n["y"] += self.speed * dt
-            if n["y"] > self.lanes[n["lane"]].bottom + 24:
+            if n["y"] > self.lanes[n["lane"]].bottom + 40:
                 if n["correct"]:
                     self._register_miss()
                 self.notes.remove(n)
 
-        # se a rodada acabou (sem notas) e bateu intervalo, prepara a PRÓXIMA pergunta e spawna
+        # terminou a onda atual; espera o "beat" pra começar a próxima
         if not self.notes and (now - self.last_spawn >= self.beat_ms):
-            self._prepare_next_prompt()   # agora sim troca a pergunta
+            # --- SFX: fim da onda/pergunta anterior
+            self._SFX("wave_end")
+            self._prepare_next_prompt()
             self._spawn_notes()
             self.last_spawn = now
 
-        # fim do jogo (encerra assim que o tempo acabar)
         if now - self.start_time >= self.game_len_ms:
             self.finished = True
             self._finish()
             return
 
         self._update_fx(dt)
+
 
     def _finish(self):
         total_events = max(1, self.hits + self.misses)
@@ -329,8 +337,103 @@ class TelaMiniPythonHero:
         elif acc >= 0.70: stars = 2
         elif acc >= 0.50: stars = 1
         else: stars = 0
+
+        # --- SFX: fim do minigame (passou se >=1 estrela)
+        self._SFX("finish", bool(stars >= 1), int(self.score))
+
         if self.on_finish:
             self.on_finish(self.score, stars)
+
+    # ---------- NOTAS: QUEBRA CONTROLADA + AUTO-FORMAT ----------
+    def _prettify_note_text(self, text: str) -> str:
+        """
+        Regras de formatação amigáveis para leitura rápida no card:
+        - ' | ' → '\\n'
+        - ';'   → '\\n'
+        - '(for|if|elif|else|while|def|try|except) ... : <algo>'  →
+          '(cabecalho):\\n    <algo>'
+        Não corrige sintaxe; só melhora a visualização.
+        """
+        t = (text or "").replace(" | ", "\n")
+
+        # quebra por ponto-e-vírgula (com ou sem espaço)
+        t = re.sub(r"\s*;\s*", "\n", t)
+
+        # quebra após cabeçalhos com ':' seguidos de conteúdo
+        # exemplo: "for i in range(3): print(i)" -> "for i in range(3):\n    print(i)"
+        t = re.sub(
+            r"(\b(for|if|elif|else|while|def|try|except)\b[^:\n]*:\s*)(\S)",
+            r"\1\n    \3",
+            t
+        )
+
+        return t
+
+    def _manual_lines(self, text: str):
+        """Quebra controlada (content + auto-format)."""
+        t = self._prettify_note_text(text)
+        lines = t.split("\n")
+        # limita o total de linhas para evitar cards gigantes (configurável)
+        if len(lines) > self.max_note_lines:
+            lines = lines[:self.max_note_lines]
+        return lines
+
+    def _fit_block_font(self, lines, max_w):
+        """
+        Diminui UM tamanho de fonte para o bloco inteiro até todas as linhas caberem.
+        Não faz word-wrap. Se nem no mínimo couber, marca overflow.
+        """
+        size = self.note_font_base_size
+        while size >= self.note_font_min_size:
+            font = pygame.font.SysFont("Consolas", size)
+            if all(font.size(ln)[0] <= max_w for ln in lines):
+                return font, lines, False
+            size -= 1
+        # mínimo e ainda não coube: aplica elipse na última linha
+        font = pygame.font.SysFont("Consolas", self.note_font_min_size)
+        overflow = False
+        new_lines = []
+        for i, ln in enumerate(lines):
+            s = ln
+            if font.size(s)[0] > max_w:
+                overflow = True
+                while s and font.size(s + "…")[0] > max_w:
+                    s = s[:-1]
+                s = s + "…" if s else "…"
+            new_lines.append(s)
+        return font, new_lines, overflow
+
+    def _draw_note_card(self, tela, lane_rect, center_y, text, is_correct):
+        card_w = lane_rect.w - 12
+        max_text_w = card_w - self.note_pad_x*2
+
+        lines = self._manual_lines(text)
+        font, lines, overflow = self._fit_block_font(lines, max_text_w)
+        if overflow:
+            try:
+                pass
+                #print(f"[PythonHero] Texto longo no card: {text!r} — encurte ou use '\\n'/' | '")
+            except Exception:
+                pass
+
+        # altura do card
+        txt_h = sum(font.get_height() for _ in lines) + self.note_line_gap*(len(lines)-1 if lines else 0)
+        card_h = self.note_pad_y*2 + txt_h
+        card_rect = pygame.Rect(lane_rect.x+6, int(center_y) - card_h//2, card_w, card_h)
+
+        # base
+        pygame.draw.rect(tela, (190, 205, 230), card_rect, border_radius=self.note_corner)
+        pygame.draw.rect(tela, (20, 20, 20), card_rect, 2, border_radius=self.note_corner)
+
+        # texto
+        y = card_rect.y + self.note_pad_y
+        for i, ln in enumerate(lines):
+            ts = font.render(ln, True, (0,0,0))
+            x = card_rect.centerx - ts.get_width()//2
+            tela.blit(ts, (x, y))
+            y += font.get_height()
+            if i < len(lines)-1:
+                y += self.note_line_gap
 
     # ---------- DESENHO ----------
     @staticmethod
@@ -380,7 +483,7 @@ class TelaMiniPythonHero:
             tela.blit(self.fonte.render(ln, True, (230,230,90)), (prompt_area.x, y))
             y += 24
 
-        # trilhas + flash verde/vermelho
+        # trilhas + flash
         key_order = [pygame.K_a, pygame.K_s, pygame.K_d, pygame.K_f]
         for i, lane in enumerate(self.lanes):
             flash = self.lane_flash[i]
@@ -395,22 +498,13 @@ class TelaMiniPythonHero:
             ksurf = self.fonte.render(key_label, True, (160, 200, 255))
             tela.blit(ksurf, (lane.centerx - ksurf.get_width()//2, lane.y - 24))
 
-        # linha de acerto
+        # hit line
         pygame.draw.line(tela, (110,190,255), (self.lanes[0].x, self.hit_y), (self.lanes[-1].right, self.hit_y), 4)
 
-        # notas (NEUTRAS)
+        # notas
         for n in self.notes:
             lane = self.lanes[n["lane"]]
-            rect = pygame.Rect(lane.x+6, int(n["y"])-18, lane.w-12, 36)
-            base_col = (190, 205, 230)
-            pygame.draw.rect(tela, base_col, rect, border_radius=10)
-            pygame.draw.rect(tela, (20, 20, 20), rect, 2, border_radius=10)
-            txt = n["text"].replace("\n", " ")
-            f = self.fonte
-            while f.size(txt)[0] > rect.w - 12 and f.get_height() > 12:
-                f = pygame.font.SysFont("Consolas", f.get_height()-1)
-            ts = f.render(txt, True, (0,0,0))
-            tela.blit(ts, (rect.centerx - ts.get_width()//2, rect.centery - ts.get_height()//2))
+            self._draw_note_card(tela, lane, n["y"], n["text"], n["correct"])
 
         # FX
         for f in self.fx:
