@@ -5,54 +5,64 @@ class BancoDeDadosIntermediario:
         self.nome_bd = nome_bd
 
     def conectar(self):
-        """Estabelece conexão com o banco de dados"""
+        """Estabelece conexão com o banco de dados."""
         return sqlite3.connect(self.nome_bd)
 
     def criarBanco(self):
-        """Cria todas as tabelas necessárias para o sistema (fase intermediária)"""
+        """Cria todas as tabelas necessárias com a estrutura final para o sistema de freelance."""
         try:
             con = self.conectar()
             cursor = con.cursor()
 
-            # Tabela cliente (NPCs que oferecem trabalhos)
+
+            # Tabela cliente (com reputação e personalidade)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS cliente (
                     id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
                     nome TEXT NOT NULL,
                     area_atuacao TEXT,
-                    reputacao INTEGER DEFAULT 50,
-                    descricao TEXT
+                    descricao TEXT,
+                    reputacao REAL DEFAULT 4.0,
+                    personalidade TEXT DEFAULT 'Amigável'
                 );
             """)
 
-            # Tabela projeto_freelance (trabalhos disponíveis)
+            # Tabela projeto_freelance (com todos os detalhes do desafio)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS projeto_freelance (
                     id_projeto INTEGER PRIMARY KEY AUTOINCREMENT,
-                    id_cliente INTEGER NOT NULL,
+                    id_cliente INTEGER,
                     titulo TEXT NOT NULL,
-                    descricao TEXT NOT NULL,
-                    dificuldade INTEGER NOT NULL,
-                    recompensa INTEGER NOT NULL,
-                    habilidade_requerida TEXT,
+                    descricao TEXT,
+                    dificuldade TEXT,
+                    recompensa REAL,
                     status TEXT DEFAULT 'disponivel',
-                    FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente) ON DELETE CASCADE
+                    req_backend INTEGER DEFAULT 1,
+                    req_frontend INTEGER DEFAULT 1,
+                    req_social INTEGER DEFAULT 1,
+                    tags TEXT,
+                    data_postagem TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    prazo_dias INTEGER DEFAULT 7,
+                    tipo_desafio TEXT,
+                    codigo_base TEXT,
+                    testes TEXT,
+                    FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
                 );
             """)
 
-            # Tabela jogador_projeto (histórico de projetos aceitos pelo jogador)
+            # Tabela jogador_projeto (relação N-N)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS jogador_projeto (
                     id_jogador INTEGER NOT NULL,
                     id_projeto INTEGER NOT NULL,
-                    status TEXT DEFAULT 'em_andamento',
+                    status TEXT, -- em_andamento, concluido, falhou
                     PRIMARY KEY (id_jogador, id_projeto),
                     FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador),
                     FOREIGN KEY (id_projeto) REFERENCES projeto_freelance(id_projeto)
                 );
             """)
 
-            # Tabela chat_cliente (mensagens trocadas entre jogador e cliente)
+            # Tabela chat_cliente (mensagens)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS chat_cliente (
                     id_chat INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,9 +77,10 @@ class BancoDeDadosIntermediario:
             """)
 
             con.commit()
-            print("Banco criado com sucesso.")
+            print("Banco de dados verificado/criado com sucesso com a nova estrutura.")
         except sqlite3.Error as erro:
             print("Erro ao criar o banco:", erro)
             raise
         finally:
-            con.close()
+            if con:
+                con.close()

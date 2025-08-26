@@ -2,108 +2,151 @@ import pygame
 from Intermediario.UI.Janela import Janela
 
 class TelaProjeto(Janela):
-    def __init__(self, projeto, cliente, callback_aceitar, callback_chat, callback_voltar):
-        super().__init__(x=290, y=80, largura=700, altura=550, titulo=f"Oportunidade: {projeto.get_titulo()}")
+    def __init__(self, largura_tela, altura_tela, projeto, cliente, mensagens, 
+                 callback_aceitar, callback_enviar_mensagem, callback_voltar):
         
+        # Usamos a altura maior como padrão para acomodar tudo de forma fixa
+        painel_w = int(largura_tela * 0.6)
+        painel_h = int(altura_tela * 0.88)
+        painel_x = int((largura_tela - painel_w) / 2)
+        painel_y = int((altura_tela - painel_h) / 2)
+
+        super().__init__(x=painel_x, y=painel_y, largura=painel_w, altura=painel_h, 
+                         titulo=f"[ CANAL DE NEGOCIAÇÃO ]: {cliente.get_nome()}")
+        
+        # Re-estilização da Janela Base
+        self.cor_fundo = (18, 24, 32)
+        self.cor_borda = (255, 190, 0)
+        self.cor_titulo_bg = (28, 34, 42)
+
         self.projeto = projeto
         self.cliente = cliente
+        self.mensagens = mensagens
         self.callback_aceitar = callback_aceitar
-        self.callback_chat = callback_chat
+        self.callback_enviar_mensagem = callback_enviar_mensagem
         self.callback_voltar = callback_voltar
 
-        # Paleta de Cores e Fontes consistentes com a tela anterior
-        self.COR_FUNDO = (245, 245, 245)
-        self.COR_TEXTO_TITULO = (10, 10, 10)
-        self.COR_TEXTO_CORPO = (80, 80, 80)
-        self.COR_BOTAO_PRIMARIO = (0, 130, 0) # Verde para Aceitar
-        self.COR_BOTAO_PRIMARIO_HOVER = (0, 150, 0)
-        self.COR_BOTAO_SECUNDARIO = (80, 80, 80)
-        self.COR_BOTAO_SECUNDARIO_HOVER = (100, 100, 100)
-        self.COR_ESTRELA = (255, 190, 0)
+        # Paleta e Fontes
+        self.COR_TEXTO_PRIMARIO = (255, 190, 0)
+        self.COR_TEXTO_SECUNDARIO = (130, 220, 255)
+        self.COR_TEXTO_CORPO = (200, 200, 200)
+        self.COR_FUNDO_CHAT = (10, 12, 15)
+        self.COR_HOVER_OPCAO = (40, 50, 65)
+        self.COR_BOTAO_ACEITAR = (0, 180, 80)
+        self.COR_BOTAO_ACEITAR_HOVER = (0, 210, 100)
+        self.COR_BOTAO_VOLTAR = (100, 100, 100)
+        self.COR_BOTAO_VOLTAR_HOVER = (120, 120, 120)
         
-        self.fonte_h1 = pygame.font.SysFont("Arial", 28, bold=True)
-        self.fonte_h2 = pygame.font.SysFont("Arial", 20, bold=True)
-        self.fonte_corpo = pygame.font.SysFont("Arial", 16)
-        self.fonte_tag = pygame.font.SysFont("Arial", 12, bold=True)
+        self.fonte_h2 = pygame.font.SysFont('Consolas', 18, bold=True)
+        self.fonte_corpo = pygame.font.SysFont('Consolas', 16)
+        self.fonte_logo = pygame.font.SysFont('Consolas', 28, bold=True)
+        
+        # Opções de diálogo
+        self.opcoes_dialogo = [
+            "Conte-me mais sobre os requisitos.", "Qual é o prazo?",
+            "Estou pronto para aceitar.", "Vou recusar, obrigado."
+        ]
+        self.botoes_dialogo_rects = {}
 
-        # Retângulos dos botões
-        self.botao_aceitar_rect = pygame.Rect(self.rect.width - 220, 40, 200, 45)
-        self.botao_chat_rect = pygame.Rect(self.rect.width - 220, 95, 200, 45)
-        self.botao_voltar_rect = pygame.Rect(20, self.rect.height - 60, 120, 40)
+        # Botões de Ação no Rodapé
+        self.botao_voltar_rect = pygame.Rect(20, self.rect.height - 70, 150, 50)
+        self.botao_aceitar_rect = pygame.Rect(self.rect.width - 220, self.rect.height - 70, 200, 50)
+
 
     def desenhar_conteudo(self, tela):
-        area_conteudo = pygame.Rect(self.rect.x, self.rect.y + 30, self.rect.width, self.rect.height - 30)
-        pygame.draw.rect(tela, self.COR_FUNDO, area_conteudo)
         mouse_pos = pygame.mouse.get_pos()
         
-        # --- Header ---
-        titulo_surf = self.fonte_h1.render(self.projeto.get_titulo(), True, self.COR_TEXTO_TITULO)
-        tela.blit(titulo_surf, (area_conteudo.x + 20, area_conteudo.y + 20))
+        # --- Seção 1: Perfil do Cliente (Topo) ---
+        area_cliente = pygame.Rect(self.rect.x + 20, self.rect.y + 40, self.rect.width - 40, 64)
+        logo_rect = pygame.Rect(area_cliente.x, area_cliente.y, 64, 64)
+        pygame.draw.rect(tela, (40, 50, 65), logo_rect, border_radius=5)
+        inicial = self.cliente.get_nome()[0].upper()
+        inicial_surf = self.fonte_logo.render(inicial, True, self.COR_TEXTO_SECUNDARIO)
+        tela.blit(inicial_surf, (logo_rect.centerx - inicial_surf.get_width()/2, logo_rect.centery - inicial_surf.get_height()/2))
+        
         cliente_surf = self.fonte_h2.render(self.cliente.get_nome(), True, self.COR_TEXTO_CORPO)
-        tela.blit(cliente_surf, (area_conteudo.x + 20, area_conteudo.y + 55))
+        tela.blit(cliente_surf, (logo_rect.right + 15, logo_rect.y + 5))
         
-        # Reputação (Mock)
-        mock_reputacao = 4.5 + (self.cliente.get_id_cliente() % 5) / 10.0 
-        estrelas = "★" * int(mock_reputacao) + "☆" * (5 - int(mock_reputacao))
-        reputacao_surf = self.fonte_corpo.render(f"{mock_reputacao:.1f} {estrelas}", True, self.COR_ESTRELA)
-        tela.blit(reputacao_surf, (area_conteudo.x + 20, area_conteudo.y + 85))
+        # --- Seção 2: Breve Descrição do Projeto ---
+        info_y = area_cliente.bottom + 15
+        pygame.draw.line(tela, self.COR_TEXTO_PRIMARIO, (self.rect.x + 20, info_y), (self.rect.right - 20, info_y), 1)
         
-        # --- Corpo ---
-        pygame.draw.line(tela, (220,220,220), (area_conteudo.x + 20, area_conteudo.y + 120), (area_conteudo.right - 20, area_conteudo.y + 120))
+        titulo_surf = self.fonte_h2.render(f"Assunto: {self.projeto.get_titulo()}", True, self.COR_TEXTO_CORPO)
+        tela.blit(titulo_surf, (self.rect.x + 20, info_y + 10))
         
-        # Descrição Completa
-        y_desc = area_conteudo.y + 140
-        linhas = [self.projeto.get_descricao()[i:i+70] for i in range(0, len(self.projeto.get_descricao()), 70)]
-        for linha in linhas:
-             linha_surf = self.fonte_corpo.render(linha, True, self.COR_TEXTO_CORPO)
-             tela.blit(linha_surf, (area_conteudo.x + 20, y_desc)); y_desc += 22
+        # --- Seção 3: Terminal de Chat (Sempre Visível) ---
+        chat_y_inicio = info_y + 40
+        # O chat agora ocupa todo o espaço até o rodapé
+        area_chat = pygame.Rect(self.rect.x + 20, chat_y_inicio, self.rect.width - 40, self.rect.height - chat_y_inicio - 90)
+        pygame.draw.rect(tela, self.COR_FUNDO_CHAT, area_chat, border_radius=8)
+        
+        log_header = self.fonte_h2.render("[ LOG DE COMUNICAÇÃO ]", True, self.COR_TEXTO_PRIMARIO)
+        tela.blit(log_header, (area_chat.x + 10, area_chat.y + 10))
 
-        # Habilidades (Mock)
-        mock_tags = [["Python", "API REST", "Web"], ["SQL", "Database", "Otimização"], ["Automação", "Web Scraping"]]
-        tags_do_projeto = mock_tags[self.projeto.get_id_projeto() % len(mock_tags)]
-        y_desc += 20 # Espaço
-        x_tag = area_conteudo.x + 20
-        for tag in tags_do_projeto:
-            tag_surf = self.fonte_tag.render(tag, True, (255,255,255))
-            tag_rect = tag_surf.get_rect(topleft=(x_tag, y_desc))
-            pygame.draw.rect(tela, (80,80,80), tag_rect.inflate(15, 8), border_radius=12)
-            tela.blit(tag_surf, tag_rect.move(8, 4))
-            x_tag += tag_rect.width + 25
+        # Log de Mensagens
+        log_area = pygame.Rect(area_chat.x + 10, area_chat.y + 40, area_chat.width - 20, area_chat.height - 130)
+        log_y = log_area.y
+        for msg in self.mensagens:
+            remetente_cor = self.COR_TEXTO_SECUNDARIO if msg.get_enviado_por() != 'jogador' else (200, 200, 90)
+            remetente_surf = self.fonte_corpo.render(f"<{msg.get_enviado_por().upper()}>", True, remetente_cor)
+            msg_surf = self.fonte_corpo.render(msg.get_mensagem(), True, self.COR_TEXTO_CORPO)
+            if log_y + msg_surf.get_height() < log_area.bottom:
+                tela.blit(remetente_surf, (log_area.x, log_y)); tela.blit(msg_surf, (log_area.x + 140, log_y)); log_y += 20
+        
+        # Área de Resposta do Jogador
+        area_resposta = pygame.Rect(area_chat.x, area_chat.bottom - 90, area_chat.width, 90)
+        pygame.draw.line(tela, self.COR_TEXTO_PRIMARIO, (area_resposta.left, area_resposta.top), (area_resposta.right, area_resposta.top), 1)
+        
+        prompt_surf = self.fonte_h2.render("Suas Respostas:", True, self.COR_TEXTO_PRIMARIO)
+        tela.blit(prompt_surf, (area_resposta.x + 10, area_resposta.y + 10))
+        
+        self.botoes_dialogo_rects.clear()
+        y_opcao = area_resposta.y + 40; x_opcao = area_resposta.x + 10
+        for i, opcao in enumerate(self.opcoes_dialogo):
+            texto_opcao = f"[{i+1}] {opcao}"; opcao_rect = self.fonte_corpo.render(texto_opcao, True, self.COR_TEXTO_CORPO).get_rect(topleft=(x_opcao, y_opcao))
+            if i == 1: y_opcao += 30; x_opcao = area_resposta.x + 10
+            else: x_opcao += opcao_rect.width + 25
+            opcao_rect.topleft = (opcao_rect.x, y_opcao)
+            self.botoes_dialogo_rects[opcao] = opcao_rect
+            cor_texto = self.COR_TEXTO_PRIMARIO if opcao_rect.collidepoint(mouse_pos) else self.COR_TEXTO_CORPO
+            opcao_surf = self.fonte_corpo.render(texto_opcao, True, cor_texto)
+            tela.blit(opcao_surf, opcao_rect)
 
-        # --- Botões de Ação ---
-        # Botão Aceitar
+        # --- Seção 4: Rodapé de Ações (Sempre visível) ---
+        voltar_abs_rect = self.botao_voltar_rect.move(self.rect.topleft)
         aceitar_abs_rect = self.botao_aceitar_rect.move(self.rect.topleft)
-        cor_aceitar = self.COR_BOTAO_PRIMARIO_HOVER if aceitar_abs_rect.collidepoint(mouse_pos) else self.COR_BOTAO_PRIMARIO
+        
+        cor_voltar = self.COR_BOTAO_VOLTAR_HOVER if voltar_abs_rect.collidepoint(mouse_pos) else self.COR_BOTAO_VOLTAR
+        pygame.draw.rect(tela, cor_voltar, voltar_abs_rect, border_radius=8)
+        voltar_surf = self.fonte_h2.render("Voltar", True, (255,255,255))
+        tela.blit(voltar_surf, (voltar_abs_rect.centerx - voltar_surf.get_width()/2, voltar_abs_rect.centery - voltar_surf.get_height()/2))
+
+        cor_aceitar = self.COR_BOTAO_ACEITAR_HOVER if aceitar_abs_rect.collidepoint(mouse_pos) else self.COR_BOTAO_ACEITAR
         pygame.draw.rect(tela, cor_aceitar, aceitar_abs_rect, border_radius=8)
         aceitar_surf = self.fonte_h2.render("Aceitar Contrato", True, (255,255,255))
         tela.blit(aceitar_surf, (aceitar_abs_rect.centerx - aceitar_surf.get_width()/2, aceitar_abs_rect.centery - aceitar_surf.get_height()/2))
         
-        # Botão Chat
-        chat_abs_rect = self.botao_chat_rect.move(self.rect.topleft)
-        cor_chat = self.COR_BOTAO_SECUNDARIO_HOVER if chat_abs_rect.collidepoint(mouse_pos) else self.COR_BOTAO_SECUNDARIO
-        pygame.draw.rect(tela, cor_chat, chat_abs_rect, border_radius=8)
-        chat_surf = self.fonte_h2.render("Chat com Cliente", True, (255,255,255))
-        tela.blit(chat_surf, (chat_abs_rect.centerx - chat_surf.get_width()/2, chat_abs_rect.centery - chat_surf.get_height()/2))
-
-        # Botão Voltar
-        voltar_abs_rect = self.botao_voltar_rect.move(self.rect.topleft)
-        pygame.draw.rect(tela, (200,200,200), voltar_abs_rect, 1, border_radius=5)
-        voltar_surf = self.fonte_corpo.render("Voltar", True, self.COR_TEXTO_CORPO)
-        tela.blit(voltar_surf, (voltar_abs_rect.centerx - voltar_surf.get_width()/2, voltar_abs_rect.centery - voltar_surf.get_height()/2))
-
     def tratar_eventos_conteudo(self, eventos):
         for evento in eventos:
             if evento.type == pygame.MOUSEBUTTONUP and evento.button == 1:
+                # Checa botões de ação do rodapé
                 if self.botao_aceitar_rect.move(self.rect.topleft).collidepoint(evento.pos):
-                    self.callback_aceitar(self.projeto)
-                    self.deve_fechar = True
-                elif self.botao_chat_rect.move(self.rect.topleft).collidepoint(evento.pos):
-                    self.callback_chat(self.projeto)
-                    self.deve_fechar = True
-                elif self.botao_voltar_rect.move(self.rect.topleft).collidepoint(evento.pos):
-                    self.callback_voltar()
-                    self.deve_fechar = True
+                    self.callback_aceitar(self.projeto); self.deve_fechar = True; return
+                if self.botao_voltar_rect.move(self.rect.topleft).collidepoint(evento.pos):
+                    self.callback_voltar(); self.deve_fechar = True; return
+                
+                # Checa os cliques nas opções de diálogo
+                for opcao, rect in self.botoes_dialogo_rects.items():
+                    if rect.collidepoint(evento.pos):
+                        if "aceitar" in opcao.lower(): self.callback_aceitar(self.projeto)
+                        elif "recusar" in opcao.lower() or "analisar" in opcao.lower(): self.callback_voltar()
+                        else: self.callback_enviar_mensagem(self.projeto, opcao)
+                        self.deve_fechar = True; return
 
     def tratar_eventos(self, eventos):
         super().tratar_eventos(eventos)
         self.tratar_eventos_conteudo(eventos)
+
+    def update(self, dt):
+        # Não precisamos mais do update para o cursor, pode ser removido
+        pass
