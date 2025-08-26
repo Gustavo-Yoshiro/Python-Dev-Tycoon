@@ -156,3 +156,12 @@ class BancoDeDados:
             raise
         finally:
             con.close()
+    def executar_e_retornar_id(self, sql: str, parametros: tuple) -> int:
+        con = self.conectar()
+        try:
+            cursor = con.cursor()
+            cursor.execute(sql, parametros)
+            con.commit()
+            return cursor.lastrowid
+        finally:
+            con.close()

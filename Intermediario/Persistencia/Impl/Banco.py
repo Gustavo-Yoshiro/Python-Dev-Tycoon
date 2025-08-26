@@ -10,10 +10,10 @@ class BancoDeDadosIntermediario:
 
     def criarBanco(self):
         """Cria todas as tabelas necessárias com a estrutura final para o sistema de freelance."""
+        con = None
         try:
             con = self.conectar()
             cursor = con.cursor()
-
 
             # Tabela cliente (com reputação e personalidade)
             cursor.execute("""
@@ -76,10 +76,37 @@ class BancoDeDadosIntermediario:
                 );
             """)
 
+            # --- NOVAS TABELAS PARA O SISTEMA DE DIÁLOGO ---
+
+            # Tabela dialogo_nos (Armazena cada "fala" ou estado da conversa)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS dialogo_nos (
+                    id_no INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_projeto INTEGER,
+                    texto_npc TEXT NOT NULL,
+                    is_inicio BOOLEAN DEFAULT 0,
+                    FOREIGN KEY (id_projeto) REFERENCES projeto_freelance(id_projeto)
+                );
+            """)
+
+            # Tabela dialogo_opcoes (Armazena as escolhas do jogador que conectam os nós)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS dialogo_opcoes (
+                    id_opcao INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_no_origem INTEGER NOT NULL,
+                    id_no_destino INTEGER,
+                    texto_opcao TEXT NOT NULL,
+                    req_social INTEGER DEFAULT 0,
+                    efeito TEXT,
+                    FOREIGN KEY (id_no_origem) REFERENCES dialogo_nos(id_no),
+                    FOREIGN KEY (id_no_destino) REFERENCES dialogo_nos(id_no)
+                );
+            """)
+
             con.commit()
-            print("Banco de dados verificado/criado com sucesso com a nova estrutura.")
+            print("Estrutura do banco de dados (freelance e diálogo) verificada/criada com sucesso.")
         except sqlite3.Error as erro:
-            print("Erro ao criar o banco:", erro)
+            print("Erro ao criar a estrutura do banco:", erro)
             raise
         finally:
             if con:
