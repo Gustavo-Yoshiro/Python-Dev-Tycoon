@@ -2,7 +2,6 @@ import pygame
 from Intermediario.UI.Janela import Janela
 
 class TelaFreelance(Janela):
-    # O __init__ agora recebe 'projetos_info', uma lista de dicionários
     def __init__(self, largura_tela, altura_tela, projeto_ativo, projetos_info, cliente_service, callback_abrir_desenvolvimento):
         
         painel_w = int(largura_tela * 0.6)
@@ -31,14 +30,18 @@ class TelaFreelance(Janela):
         self.COR_TEXTO_SUCESSO = (0, 220, 120)
         self.COR_TEXTO_FALHA = (220, 50, 50)
         self.COR_FUNDO_HOVER = (40, 50, 65)
+        self.CORES_LOGO = [(60,80,120), (180,60,60), (60,120,80), (180,140,60)]
+
 
         self.fonte_h1 = pygame.font.SysFont('Consolas', 24, bold=True)
         self.fonte_h2 = pygame.font.SysFont('Consolas', 18, bold=True)
         self.fonte_item = pygame.font.SysFont('Consolas', 16)
+        self.fonte_logo = pygame.font.SysFont('Consolas', 32, bold=True)
+
         
         # Atributos para o scrollbar funcional
         self.scroll_offset = 0
-        self.altura_linha = 50
+        self.altura_linha = 80 # Aumenta a altura para acomodar a logo
         self.y_inicio_lista = 80
         self.max_visiveis = (self.rect.height - self.y_inicio_lista - 40) // self.altura_linha
         
@@ -113,6 +116,11 @@ class TelaFreelance(Janela):
     def _desenhar_lista_projetos(self, tela):
         """Desenha a lista de projetos disponíveis, usando a informação pré-processada do serviço."""
         mouse_pos = pygame.mouse.get_pos()
+        
+        # 2. Título da página
+        titulo_pagina_surf = self.fonte_h1.render("Feed de Contratos", True, self.COR_TEXTO_SECUNDARIO)
+        tela.blit(titulo_pagina_surf, (self.rect.x + 20, self.rect.y + 45))
+
         infos_visiveis = self.projetos_info[self.scroll_offset : self.scroll_offset + self.max_visiveis]
         self.rects_projetos.clear()
 
@@ -121,29 +129,39 @@ class TelaFreelance(Janela):
             projeto = info["projeto"]
             tem_req = info["pode_aceitar"]
 
-            linha_rect = pygame.Rect(self.rect.x + 20, y_linha, self.rect.width - 70, self.altura_linha)
-            self.rects_projetos[projeto.get_id_projeto()] = {"rect": linha_rect, "info": info}
+            # 1. Divisão mais clara dos projetos
+            card_rect = pygame.Rect(self.rect.x + 20, y_linha, self.rect.width - 70, self.altura_linha)
+            self.rects_projetos[projeto.get_id_projeto()] = {"rect": card_rect, "info": info}
+            
+            cor_fundo_card = self.COR_FUNDO_HOVER if card_rect.collidepoint(mouse_pos) and tem_req else (28, 34, 42)
+            pygame.draw.rect(tela, cor_fundo_card, card_rect, border_radius=5)
+            
+            # 3. Espaço para a logo do cliente
+            logo_rect = pygame.Rect(card_rect.x + 10, card_rect.y + 10, 60, 60)
+            cliente = self._get_cliente(projeto.get_id_cliente())
+            cliente_nome = cliente.get_nome() if cliente else "N/A"
+            cor_logo_fundo = self.CORES_LOGO[projeto.get_id_cliente() % len(self.CORES_LOGO)]
+            pygame.draw.rect(tela, cor_logo_fundo, logo_rect, border_radius=5)
+            inicial = cliente_nome[0].upper() if cliente_nome != "N/A" else "?"
+            inicial_surf = self.fonte_logo.render(inicial, True, (255, 255, 255))
+            tela.blit(inicial_surf, (logo_rect.centerx - inicial_surf.get_width() / 2, logo_rect.centery - inicial_surf.get_height() / 2))
+
+            info_x = logo_rect.right + 15
             
             cor_texto_titulo = self.COR_TEXTO_CORPO if tem_req else self.COR_TEXTO_BLOQUEADO
             
-            if linha_rect.collidepoint(mouse_pos) and tem_req:
-                pygame.draw.rect(tela, self.COR_FUNDO_HOVER, linha_rect)
-                selector_surf = self.fonte_item.render("[>]", True, self.COR_TEXTO_PRIMARIO)
-                tela.blit(selector_surf, (linha_rect.x + 10, linha_rect.y + 15))
-
             titulo_surf = self.fonte_item.render(projeto.get_titulo(), True, cor_texto_titulo)
-            tela.blit(titulo_surf, (linha_rect.x + 50, linha_rect.y + 8))
+            tela.blit(titulo_surf, (info_x, card_rect.y + 15))
             
-            cliente = self._get_cliente(projeto.get_id_cliente())
-            cliente_surf = self.fonte_item.render(f"Cliente: {cliente.get_nome()}", True, self.COR_TEXTO_BLOQUEADO)
-            tela.blit(cliente_surf, (linha_rect.x + 50, linha_rect.y + 28))
+            cliente_surf = self.fonte_item.render(f"Cliente: {cliente_nome}", True, self.COR_TEXTO_BLOQUEADO)
+            tela.blit(cliente_surf, (info_x, card_rect.y + 35))
 
             req_str = f"Req: B{projeto.get_req_backend()}/F{projeto.get_req_frontend()}/S{projeto.get_req_social()}"
             cor_req = self.COR_TEXTO_SUCESSO if tem_req else self.COR_TEXTO_FALHA
             req_surf = self.fonte_item.render(req_str, True, cor_req)
-            tela.blit(req_surf, (linha_rect.right - req_surf.get_width() - 10, linha_rect.y + 15))
+            tela.blit(req_surf, (card_rect.right - req_surf.get_width() - 15, card_rect.y + 25))
             
-            y_linha += self.altura_linha + 5
+            y_linha += self.altura_linha + 10
 
         self._desenhar_scrollbar(tela)
 

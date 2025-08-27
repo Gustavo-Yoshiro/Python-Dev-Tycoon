@@ -4,19 +4,18 @@ import random
 from datetime import datetime
 
 # --- Importações de Entidades e Serviços ---
-# Certifique-se de que os caminhos de importação correspondem à sua estrutura de pastas
 from Iniciante.Persistencia.Entidade.Jogador import Jogador
 from Intermediario.Persistencia.Entidade.ProjetoFreelance import ProjetoFreelance
+from Intermediario.Persistencia.Entidade.JogadorProjeto import JogadorProjeto
 from Intermediario.Service.Impl.ProjetoFreelanceServiceImpl import ProjetoFreelanceServiceImpl
 from Intermediario.Service.Impl.ClienteServiceImpl import ClienteServiceImpl
 from Iniciante.Service.Impl.JogadorServiceImpl import JogadorServiceImpl
 from Intermediario.Service.Impl.JogadorProjetoServiceImpl import JogadorProjetoServiceImpl
-# from Intermediario.Service.Impl.ValidacaoServiceImpl import ValidacaoServiceImpl # Para o futuro IDE
+from Intermediario.Service.Impl.ValidacaoServiceImpl import ValidacaoServiceImpl
 
 # --- Importações das Janelas de UI ---
 from Intermediario.UI.TelaFreelance import TelaFreelance
-from Intermediario.UI.TelaProjeto import TelaProjeto
-# from Intermediario.UI.TelaDesenvolvimento import TelaDesenvolvimento # Para o futuro IDE
+from Intermediario.UI.TelaDesenvolvimento import TelaDesenvolvimento
 from Intermediario.UI.Janela import Janela
 
 
@@ -43,7 +42,7 @@ def main():
     cliente_service = ClienteServiceImpl()
     jogador_service = JogadorServiceImpl()
     jogador_projeto_service = JogadorProjetoServiceImpl()
-    # validacao_service = ValidacaoServiceImpl() # Para o futuro IDE
+    validacao_service = ValidacaoServiceImpl()
 
     # Carrega o jogador atual do banco de dados
     JOGADOR_ATUAL = jogador_service.buscar_jogador_por_id(1)
@@ -66,7 +65,6 @@ def main():
         
         projetos_info = []
         if not projeto_ativo:
-            # Usa o serviço refatorado para obter a lista de projetos com o status de requisitos
             projetos_info = projeto_service.listar_projetos_para_jogador(JOGADOR_ATUAL)
 
         janela = TelaFreelance(
@@ -74,49 +72,59 @@ def main():
             projeto_ativo=projeto_ativo,
             projetos_info=projetos_info,
             cliente_service=cliente_service,
-            callback_abrir_desenvolvimento=abrir_janela_detalhes # Clicar em um projeto abre os detalhes
+            callback_abrir_desenvolvimento=abrir_janela_desenvolvimento
         )
         janelas_abertas.append(janela)
 
-    def abrir_janela_detalhes(projeto):
-        """Abre o Dossiê de Contrato (Painel de Análise Estratégica)."""
+    def abrir_janela_desenvolvimento(projeto):
+        """
+        Abre o IDE para trabalhar num projeto.
+        Se o projeto não for o ativo, tenta aceitá-lo primeiro.
+        """
+        projeto_ativo_atual = jogador_projeto_service.buscar_projeto_ativo(JOGADOR_ATUAL.get_id_jogador())
+
+        if projeto_ativo_atual and projeto.get_id_projeto() == projeto_ativo_atual.get_id_projeto():
+            print("Continuando trabalho no projeto ativo...")
+        else:
+            sucesso = jogador_projeto_service.aceitar_projeto(JOGADOR_ATUAL, projeto)
+            if not sucesso:
+                print("Não foi possível iniciar o trabalho. Verifique os logs do serviço.")
+                abrir_janela_freelance()
+                return
+
         janelas_abertas.clear()
-        
         cliente = cliente_service.buscar_cliente_por_id(projeto.get_id_cliente())
         
-        janela = TelaProjeto(
+        janela = TelaDesenvolvimento(
             LARGURA, ALTURA,
             projeto=projeto,
             cliente=cliente,
-            jogador=JOGADOR_ATUAL,
-            callback_aceitar=aceitar_projeto,
-            callback_voltar=abrir_janela_freelance
+            callback_validar=validar_solucao_jogador,
+            callback_entregar=entregar_projeto,
+            callback_desistir=desistir_projeto
         )
         janelas_abertas.append(janela)
 
-    def aceitar_projeto(projeto):
-        """Lógica final para aceitar um contrato, chamada pela TelaProjeto."""
-        # 1. Checa se o jogador já tem um projeto ativo
-        if jogador_projeto_service.buscar_projeto_ativo(JOGADOR_ATUAL.get_id_jogador()):
-            print("ERRO: Jogador já possui um projeto ativo.")
-            # Idealmente, mostrar uma mensagem visual para o jogador
-            return
-
-        # 2. Checa se o jogador tem os requisitos de skill
-        tem_req = (JOGADOR_ATUAL.get_backend() >= projeto.get_req_backend() and
-                   JOGADOR_ATUAL.get_frontend() >= projeto.get_req_frontend() and
-                   JOGADOR_ATUAL.get_social() >= projeto.get_req_social())
-
-        if not tem_req:
-            print("SKILLS INSUFICIENTES! Não é possível aceitar este contrato.")
-            return
-            
-        # 3. Se tudo estiver certo, aceita o projeto
-        # (Aqui você chamaria o service para criar a relação jogador_projeto no banco)
-        print(f"Contrato '{projeto.get_titulo()}' aceito com sucesso!")
-        jogador_projeto_service(aceitar_projeto(projeto))
+    def validar_solucao_jogador(projeto, codigo_jogador):
+        """Função chamada pelo botão 'Executar Testes' no IDE."""
+        print("Validando código...")
+        resultado = validacao_service.validar_solucao(projeto, codigo_jogador)
         
-        # 4. Volta para a tela de freelance, que agora mostrará o painel de projeto ativo
+        if resultado["sucesso"]:
+            print("Todos os testes passaram! Projeto pode ser entregue.")
+        else:
+            print("Falha nos testes.")
+            
+        return resultado
+
+    def entregar_projeto(projeto):
+        """Delega a lógica de finalização para o serviço e atualiza o estado do jogo."""
+        jogador_projeto_service.finalizar_projeto(JOGADOR_ATUAL, projeto)
+        abrir_janela_freelance()
+
+    def desistir_projeto(projeto):
+        """Delega a lógica de desistência para o serviço e atualiza o estado do jogo."""
+        jogador_projeto_service.desistir_projeto(JOGADOR_ATUAL, projeto)
         abrir_janela_freelance()
 
     # --- Callbacks do Menu Principal ---

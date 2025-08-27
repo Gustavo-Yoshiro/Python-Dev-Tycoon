@@ -12,7 +12,7 @@ def testar_jogador():
         id_jogador=None,
         nome="João Dev",
         id_fase=1,
-        social=10,
+        social=1,
         dinheiro=150.0,
         backend=2,
         frontend=3

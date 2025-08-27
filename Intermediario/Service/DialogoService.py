@@ -18,3 +18,7 @@ class DialogoService(ABC):
     def buscar_proximo_no(self, id_no_destino):
         """Busca o próximo nó da conversa com base na escolha do jogador."""
         pass
+
+    @abstractmethod
+    def processar_escolha_dialogo(self, projeto, opcao_escolhida, jogador):
+        pass

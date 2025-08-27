@@ -14,7 +14,19 @@ class BancoDeDadosIntermediario:
         try:
             con = self.conectar()
             cursor = con.cursor()
-
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_cliente (
+                    id_chat INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_jogador INTEGER NOT NULL,
+                    id_cliente INTEGER NOT NULL,
+                    mensagem TEXT NOT NULL,
+                    enviado_por TEXT NOT NULL, -- 'jogador' ou 'cliente'
+                    data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador),
+                    FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
+                );
+            """)
+            
             # Tabela cliente (com reputação e personalidade)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS cliente (
