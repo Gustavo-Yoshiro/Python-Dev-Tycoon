@@ -19,6 +19,7 @@ from Intermediario.UI.TelaEscolhaMiniGame import TelaEscolhaMiniGame
 from Intermediario.UI.TelaBugSquashArcade import TelaBugSquashArcade
 from Intermediario.UI.TelaPyFootTactics import TelaPyFootTactics
 
+from Intermediario.UI.TelaIntermediario import TelaIntermediario
 #audio minigames
 from Intermediario.Utils.audio_core import AudioEngine
 from Intermediario.Utils.sfx_pyfoot import SFXPyFoot
@@ -61,6 +62,9 @@ class GameManager:
 
         # bônus acumulado pelas estrelas do Iniciante (fases 1..8)
         self.bonus_backend_iniciante = 0
+
+        #tela intermediario
+        self.tela_intermediario = None
 
         #tela loja
         self.tela_loja = None
@@ -139,6 +143,39 @@ class GameManager:
         if self.tela_atual == "resultado" and self.tela_resultado:
             return self.tela_resultado.painel_visivel
         return False
+
+    #testando tela intermediaria
+    def is_intermediario(self) -> bool:
+        return bool(self.jogador_atual) and 9 <= self.jogador_atual.get_id_fase() <= 16
+
+    def abrir_menu_intermediario(self):
+        """Abre o menu principal do Intermediário somente se o jogador estiver no Intermediário."""
+        if not self.is_intermediario():
+            # fora do intermediário você pode ignorar ou mandar direto para exercícios
+            # self.iniciar_exercicio()
+            return
+
+        self.tela_intermediario = TelaIntermediario(
+            callback_exercicios=self._menu_ir_exercicios,
+            callback_freelancer=self.ir_para_freelancer,  # placeholder (abaixo)
+            callback_loja=self.ir_para_loja
+        )
+        self.tela_atual = "menu_intermediario"
+
+    def _menu_ir_exercicios(self):
+        # Fecha o menu e vai para exercícios
+        self.tela_intermediario = None
+        self.iniciar_exercicio()
+
+    def ir_para_freelancer(self):
+        # TODO: troque pela sua tela real de freelance quando estiver pronta
+        print("[TODO] Tela de Freelance ainda não implementada.")
+        # Exemplo: pode reusar um hub ou retornar à introdução
+        # self.tela_escolha_mg = TelaEscolhaMiniGame(self.largura, self.altura, on_choose=self._iniciar_minigame_escolhido)
+        # self.tela_atual = "escolha_mg"
+        self.mostrar_introducao()
+
+    #aqui fecha
 
 
     def ir_para_loja(self):
@@ -708,7 +745,6 @@ class GameManager:
                 self.tela_escolha_mg.tratar_eventos(eventos)
                 self.tela_escolha_mg.desenhar(self.tela)
 
-
             elif self.tela_atual in ["introducao", "exercicio", "resultado"]:
                 # fundo
                 self.tela.blit(self.fundo_principal, (0, 0))
@@ -831,6 +867,8 @@ class GameManager:
                 and 9 <= self.jogador_atual.get_id_fase() <= 16
                 and self.tela_atual in ("introducao", "exercicio", "resultado")
             ):
+                
+                #botao loja
                 botao_loja = pygame.Rect(self.largura - 220, 40, 180, 50)
                 pygame.draw.rect(self.tela, (70, 120, 200), botao_loja, border_radius=8)
                 fonte = pygame.font.SysFont('Arial', 28, bold=True)
@@ -876,6 +914,7 @@ class GameManager:
                     if ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
                         if botao_loja.collidepoint(ev.pos):
                             self.ir_para_loja()
+                        
 
 
 
