@@ -7,6 +7,10 @@ class JogadorProjetoPersistencia(ABC):
         pass
 
     @abstractmethod
+    def buscar(self, id_jogador, id_projeto):
+        pass
+
+    @abstractmethod
     def listar_por_jogador(self, id_jogador):
         pass
 
@@ -15,5 +19,5 @@ class JogadorProjetoPersistencia(ABC):
         pass
 
     @abstractmethod
-    def buscar(self, id_jogador: int, id_projeto: int):
+    def atualizar_detalhes(self, id_jogador, id_projeto, novos_detalhes):
         pass

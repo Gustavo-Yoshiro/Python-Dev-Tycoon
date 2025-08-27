@@ -65,11 +65,11 @@ class TelaProjeto(Janela):
         y = rect.y
         for linha in linhas:
             if y + fonte.get_height() > rect.bottom:
-                break # Impede que o texto vaze para fora da área
+                break
             linha_surf = fonte.render(linha, True, cor)
             tela.blit(linha_surf, (rect.x, y))
-            y += fonte.get_height() # Move para a próxima linha
-        return y # Retorna a posição Y final para o próximo desenho
+            y += fonte.get_height()
+        return y
 
     def desenhar_conteudo(self, tela):
         mouse_pos = pygame.mouse.get_pos()
@@ -105,17 +105,28 @@ class TelaProjeto(Janela):
         info_y = area_cliente.bottom + 15
         pygame.draw.line(tela, self.COR_TEXTO_PRIMARIO, (self.rect.x + 20, info_y), (self.rect.right - 20, info_y), 1)
         
-        # CORREÇÃO AQUI: Usa a função de quebra de linha para o briefing
-        briefing_rect = pygame.Rect(self.rect.x + 20, info_y + 10, self.rect.width - 40, 60) # Área definida para o briefing
+        briefing_rect = pygame.Rect(self.rect.x + 20, info_y + 10, self.rect.width - 40, 60)
         y_apos_briefing = self.desenhar_texto_quebra_linha(tela, f"Briefing: {self.projeto.get_descricao()}", briefing_rect, self.fonte_h2, self.COR_TEXTO_CORPO)
         
-        if self.detalhes_adicionais:
-            detalhes_rect = pygame.Rect(self.rect.x + 20, y_apos_briefing + 10, self.rect.width - 40, 60)
-            self.desenhar_texto_quebra_linha(tela, self.detalhes_adicionais, detalhes_rect, self.fonte_corpo, self.COR_TEXTO_SECUNDARIO)
+        # --- NOVA SECÇÃO: Requisitos ---
+        req_y = y_apos_briefing + 10
+        pygame.draw.line(tela, self.COR_TEXTO_PRIMARIO, (self.rect.x + 20, req_y), (self.rect.right - 20, req_y), 1)
+        req_header_surf = self.fonte_h2.render("[ REQUISITOS TÉCNICOS ]", True, self.COR_TEXTO_PRIMARIO)
+        tela.blit(req_header_surf, (self.rect.x + 20, req_y + 10))
 
+        req_backend_surf = self.fonte_corpo.render(f"Backend: Nível {self.projeto.get_req_backend()}", True, self.COR_TEXTO_CORPO)
+        tela.blit(req_backend_surf, (self.rect.x + 30, req_y + 40))
+        req_frontend_surf = self.fonte_corpo.render(f"Frontend: Nível {self.projeto.get_req_frontend()}", True, self.COR_TEXTO_CORPO)
+        tela.blit(req_frontend_surf, (self.rect.x + 250, req_y + 40))
+        req_social_surf = self.fonte_corpo.render(f"Social: Nível {self.projeto.get_req_social()}", True, self.COR_TEXTO_CORPO)
+        tela.blit(req_social_surf, (self.rect.x + 470, req_y + 40))
+        
         # --- Seção 3: Terminal de Chat ---
-        chat_y_inicio = info_y + 100
-        area_chat = pygame.Rect(self.rect.x + 20, chat_y_inicio, self.rect.width - 40, self.rect.height - chat_y_inicio - 90)
+        chat_y_inicio = req_y + 70 # Posição Y onde o chat começa
+        rodape_y_inicio = self.rect.y + self.rect.height - 80 # Posição Y onde o rodapé começa
+        chat_height = rodape_y_inicio - chat_y_inicio # Calcula a altura para preencher o espaço
+
+        area_chat = pygame.Rect(self.rect.x + 20, chat_y_inicio, self.rect.width - 40, chat_height)
         pygame.draw.rect(tela, self.COR_FUNDO_CHAT, area_chat, border_radius=8)
         
         log_header = self.fonte_h2.render("[ LOG DE COMUNICAÇÃO ]", True, self.COR_TEXTO_PRIMARIO)

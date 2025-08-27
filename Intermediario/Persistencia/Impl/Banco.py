@@ -14,20 +14,9 @@ class BancoDeDadosIntermediario:
         try:
             con = self.conectar()
             cursor = con.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS chat_cliente (
-                    id_chat INTEGER PRIMARY KEY AUTOINCREMENT,
-                    id_jogador INTEGER NOT NULL,
-                    id_cliente INTEGER NOT NULL,
-                    mensagem TEXT NOT NULL,
-                    enviado_por TEXT NOT NULL, -- 'jogador' ou 'cliente'
-                    data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador),
-                    FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
-                );
-            """)
-            
+
             # Tabela cliente (com reputação e personalidade)
+            # Deve ser criada antes de 'projeto_freelance'
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS cliente (
                     id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,12 +51,13 @@ class BancoDeDadosIntermediario:
                 );
             """)
 
-            # Tabela jogador_projeto (relação N-N)
+            # Tabela jogador_projeto (relação N-N com a nova coluna)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS jogador_projeto (
                     id_jogador INTEGER NOT NULL,
                     id_projeto INTEGER NOT NULL,
                     status TEXT, -- em_andamento, concluido, falhou
+                    detalhes_descobertos TEXT, -- Armazena detalhes extras
                     PRIMARY KEY (id_jogador, id_projeto),
                     FOREIGN KEY (id_jogador) REFERENCES jogador(id_jogador),
                     FOREIGN KEY (id_projeto) REFERENCES projeto_freelance(id_projeto)
@@ -119,6 +109,31 @@ class BancoDeDadosIntermediario:
             print("Estrutura do banco de dados (freelance e diálogo) verificada/criada com sucesso.")
         except sqlite3.Error as erro:
             print("Erro ao criar a estrutura do banco:", erro)
+            raise
+        finally:
+            if con:
+                con.close()
+
+    def apagarTabelas(self):
+        """Apaga todas as tabelas relacionadas ao sistema freelance e diálogo."""
+        con = None
+        try:
+            con = self.conectar()
+            cursor = con.cursor()
+
+            cursor.executescript("""
+                DROP TABLE IF EXISTS jogador_projeto;
+                DROP TABLE IF EXISTS chat_cliente;
+                DROP TABLE IF EXISTS dialogo_opcoes;
+                DROP TABLE IF EXISTS dialogo_nos;
+                DROP TABLE IF EXISTS projeto_freelance;
+                DROP TABLE IF EXISTS cliente;
+            """)
+
+            con.commit()
+            print("Todas as tabelas foram apagadas com sucesso.")
+        except sqlite3.Error as erro:
+            print("Erro ao apagar as tabelas:", erro)
             raise
         finally:
             if con:

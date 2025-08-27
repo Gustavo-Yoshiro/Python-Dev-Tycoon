@@ -12,7 +12,6 @@ class TelaFreelance(Janela):
         titulo_janela = "[ PAINEL DE CONTROLE ]" if projeto_ativo else "[ F.L.N.C.R. ] - Contratos Disponíveis"
         super().__init__(x=painel_x, y=painel_y, largura=painel_w, altura=painel_h, titulo=titulo_janela)
         
-        # Re-estilização da Janela Base para o tema F.L.N.C.R.
         self.cor_fundo = (18, 24, 32)
         self.cor_borda = (255, 190, 0)
         self.cor_titulo_bg = (28, 34, 42)
@@ -27,22 +26,30 @@ class TelaFreelance(Janela):
         self.COR_TEXTO_SECUNDARIO = (130, 220, 255)
         self.COR_TEXTO_CORPO = (200, 200, 200)
         self.COR_TEXTO_BLOQUEADO = (120, 100, 100)
-        self.COR_TEXTO_SUCESSO = (0, 220, 120)
-        self.COR_TEXTO_FALHA = (220, 50, 50)
         self.COR_FUNDO_HOVER = (40, 50, 65)
         self.CORES_LOGO = [(60,80,120), (180,60,60), (60,120,80), (180,140,60)]
-
+        
+        self.CORES_DIFICULDADE = {
+            'Iniciante': (0, 180, 100),
+            'Intermediario': (255, 180, 0),
+            'Difícil': (220, 50, 50)
+        }
 
         self.fonte_h1 = pygame.font.SysFont('Consolas', 24, bold=True)
         self.fonte_h2 = pygame.font.SysFont('Consolas', 18, bold=True)
         self.fonte_item = pygame.font.SysFont('Consolas', 16)
         self.fonte_logo = pygame.font.SysFont('Consolas', 32, bold=True)
-
+        self.fonte_tag = pygame.font.SysFont('Consolas', 14, bold=True)
+        
+        # --- NOVO: Lógica de Filtro ---
+        self.filtro_ativo = "Todos"
+        self.projetos_filtrados = []
+        self.botoes_filtro_rects = {}
         
         # Atributos para o scrollbar funcional
         self.scroll_offset = 0
-        self.altura_linha = 80 # Aumenta a altura para acomodar a logo
-        self.y_inicio_lista = 80
+        self.altura_linha = 80
+        self.y_inicio_lista = 120 # Desce a lista para dar espaço aos filtros
         self.max_visiveis = (self.rect.height - self.y_inicio_lista - 40) // self.altura_linha
         
         self.scrollbar_track_rect = pygame.Rect(self.rect.width - 25, self.y_inicio_lista, 15, self.rect.height - self.y_inicio_lista - 40)
@@ -51,6 +58,19 @@ class TelaFreelance(Janela):
 
         self.rects_projetos = {}
         self.cache_clientes = {}
+        self._aplicar_filtro() # Aplica o filtro inicial
+        self.atualizar_handle_scrollbar()
+
+    def _aplicar_filtro(self):
+        """Filtra a lista de projetos com base no filtro ativo."""
+        if self.filtro_ativo == "Todos":
+            self.projetos_filtrados = self.projetos_info
+        else:
+            self.projetos_filtrados = [
+                info for info in self.projetos_info 
+                if info["projeto"].get_dificuldade() == self.filtro_ativo
+            ]
+        self.scroll_offset = 0 # Reseta o scroll ao mudar de filtro
         self.atualizar_handle_scrollbar()
 
     def _get_cliente(self, cliente_id):
@@ -59,8 +79,7 @@ class TelaFreelance(Janela):
         return self.cache_clientes[cliente_id]
 
     def atualizar_handle_scrollbar(self):
-        """Calcula o tamanho e a posição do handle com base no scroll_offset."""
-        num_projetos = len(self.projetos_info)
+        num_projetos = len(self.projetos_filtrados) # Usa a lista filtrada
         if not num_projetos or num_projetos <= self.max_visiveis:
             self.scrollbar_handle_rect.height = 0; return
 
@@ -76,8 +95,7 @@ class TelaFreelance(Janela):
         self.scrollbar_handle_rect.y = self.scrollbar_track_rect.y + scrollable_space * scroll_ratio
         
     def _desenhar_scrollbar(self, tela):
-        """Desenha o scrollbar se for necessário."""
-        if len(self.projetos_info) > self.max_visiveis:
+        if len(self.projetos_filtrados) > self.max_visiveis: # Usa a lista filtrada
             track_abs = self.scrollbar_track_rect.move(self.rect.topleft)
             handle_abs = self.scrollbar_handle_rect.move(self.rect.topleft)
             pygame.draw.rect(tela, (28, 34, 42), track_abs, border_radius=7)
@@ -92,7 +110,6 @@ class TelaFreelance(Janela):
             self._desenhar_lista_projetos(tela)
 
     def _desenhar_painel_projeto_ativo(self, tela):
-        """Desenha a tela focada no projeto que o jogador já aceitou."""
         cliente = self._get_cliente(self.projeto_ativo.get_id_cliente())
         
         titulo_surf = self.fonte_h1.render(self.projeto_ativo.get_titulo(), True, self.COR_TEXTO_PRIMARIO)
@@ -101,7 +118,7 @@ class TelaFreelance(Janela):
         cliente_surf = self.fonte_h2.render(f"Cliente: {cliente.get_nome()}", True, self.COR_TEXTO_CORPO)
         tela.blit(cliente_surf, (self.rect.x + 30, self.rect.y + 90))
 
-        recompensa_surf = self.fonte_h2.render(f"Pagamento: R$ {self.projeto_ativo.get_recompensa():.2f}", True, self.COR_TEXTO_SUCESSO)
+        recompensa_surf = self.fonte_h2.render(f"Pagamento: R$ {self.projeto_ativo.get_recompensa():.2f}", True, (0, 220, 120))
         tela.blit(recompensa_surf, (self.rect.x + 30, self.rect.y + 120))
         
         status_surf = self.fonte_h2.render("Status: [ EM ANDAMENTO ]", True, self.COR_TEXTO_SECUNDARIO)
@@ -114,14 +131,32 @@ class TelaFreelance(Janela):
         tela.blit(texto_btn, (self.botao_abrir_dev_rect.centerx - texto_btn.get_width()/2, self.botao_abrir_dev_rect.centery - texto_btn.get_height()/2))
 
     def _desenhar_lista_projetos(self, tela):
-        """Desenha a lista de projetos disponíveis, usando a informação pré-processada do serviço."""
         mouse_pos = pygame.mouse.get_pos()
         
-        # 2. Título da página
         titulo_pagina_surf = self.fonte_h1.render("Feed de Contratos", True, self.COR_TEXTO_SECUNDARIO)
         tela.blit(titulo_pagina_surf, (self.rect.x + 20, self.rect.y + 45))
 
-        infos_visiveis = self.projetos_info[self.scroll_offset : self.scroll_offset + self.max_visiveis]
+        # --- NOVO: Desenha os botões de filtro ---
+        filtros = ["Todos", "Iniciante", "Intermediario", "Difícil"]
+        x_filtro = self.rect.x + 20
+        y_filtro = self.rect.y + 80
+        self.botoes_filtro_rects.clear()
+        for filtro in filtros:
+            texto_surf = self.fonte_item.render(filtro, True, self.COR_TEXTO_CORPO)
+            padding = 20
+            rect = pygame.Rect(x_filtro, y_filtro, texto_surf.get_width() + padding, 30)
+            self.botoes_filtro_rects[filtro] = rect
+            
+            is_active = self.filtro_ativo == filtro
+            cor_fundo = self.COR_TEXTO_PRIMARIO if is_active else self.COR_FUNDO_HOVER if rect.collidepoint(mouse_pos) else (28, 34, 42)
+            cor_texto = (18, 24, 32) if is_active else self.COR_TEXTO_CORPO
+            
+            pygame.draw.rect(tela, cor_fundo, rect, border_radius=15)
+            texto_renderizado = self.fonte_item.render(filtro, True, cor_texto)
+            tela.blit(texto_renderizado, (rect.centerx - texto_renderizado.get_width()/2, rect.centery - texto_renderizado.get_height()/2))
+            x_filtro += rect.width + 10
+
+        infos_visiveis = self.projetos_filtrados[self.scroll_offset : self.scroll_offset + self.max_visiveis]
         self.rects_projetos.clear()
 
         y_linha = self.rect.y + self.y_inicio_lista
@@ -129,14 +164,12 @@ class TelaFreelance(Janela):
             projeto = info["projeto"]
             tem_req = info["pode_aceitar"]
 
-            # 1. Divisão mais clara dos projetos
             card_rect = pygame.Rect(self.rect.x + 20, y_linha, self.rect.width - 70, self.altura_linha)
             self.rects_projetos[projeto.get_id_projeto()] = {"rect": card_rect, "info": info}
             
             cor_fundo_card = self.COR_FUNDO_HOVER if card_rect.collidepoint(mouse_pos) and tem_req else (28, 34, 42)
             pygame.draw.rect(tela, cor_fundo_card, card_rect, border_radius=5)
             
-            # 3. Espaço para a logo do cliente
             logo_rect = pygame.Rect(card_rect.x + 10, card_rect.y + 10, 60, 60)
             cliente = self._get_cliente(projeto.get_id_cliente())
             cliente_nome = cliente.get_nome() if cliente else "N/A"
@@ -156,20 +189,23 @@ class TelaFreelance(Janela):
             cliente_surf = self.fonte_item.render(f"Cliente: {cliente_nome}", True, self.COR_TEXTO_BLOQUEADO)
             tela.blit(cliente_surf, (info_x, card_rect.y + 35))
 
-            req_str = f"Req: B{projeto.get_req_backend()}/F{projeto.get_req_frontend()}/S{projeto.get_req_social()}"
-            cor_req = self.COR_TEXTO_SUCESSO if tem_req else self.COR_TEXTO_FALHA
-            req_surf = self.fonte_item.render(req_str, True, cor_req)
-            tela.blit(req_surf, (card_rect.right - req_surf.get_width() - 15, card_rect.y + 25))
+            dificuldade_texto = projeto.get_dificuldade()
+            cor_dificuldade = self.CORES_DIFICULDADE.get(dificuldade_texto, (150, 150, 150))
+            
+            tag_rect = pygame.Rect(card_rect.right - 120, card_rect.y + 25, 100, 30)
+            pygame.draw.rect(tela, cor_dificuldade, tag_rect, border_radius=15)
+            
+            dificuldade_surf = self.fonte_tag.render(dificuldade_texto, True, (255,255,255))
+            tela.blit(dificuldade_surf, (tag_rect.centerx - dificuldade_surf.get_width()/2, tag_rect.centery - dificuldade_surf.get_height()/2))
             
             y_linha += self.altura_linha + 10
 
         self._desenhar_scrollbar(tela)
 
     def tratar_eventos(self, eventos):
-        """Lida com todos os eventos, incluindo o scrollbar e os dois modos de visualização."""
         super().tratar_eventos(eventos)
         
-        max_scroll = len(self.projetos_info) - self.max_visiveis if self.projetos_info else 0
+        max_scroll = len(self.projetos_filtrados) - self.max_visiveis if self.projetos_filtrados else 0
 
         for evento in eventos:
             if evento.type == pygame.MOUSEWHEEL:
@@ -199,6 +235,13 @@ class TelaFreelance(Janela):
                         self.callback_abrir_desenvolvimento(self.projeto_ativo)
                         self.deve_fechar = True
                 else: # Modo lista
+                    # --- NOVO: Checa cliques nos filtros ---
+                    for filtro, rect in self.botoes_filtro_rects.items():
+                        if rect.collidepoint(evento.pos):
+                            self.filtro_ativo = filtro
+                            self._aplicar_filtro()
+                            return # Consome o clique
+
                     for info_clique in self.rects_projetos.values():
                         if info_clique["rect"].collidepoint(evento.pos):
                             if info_clique["info"]["pode_aceitar"]:
