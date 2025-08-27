@@ -3,14 +3,16 @@ from Intermediario.Service.JogadorProjetoService import JogadorProjetoService
 from Intermediario.Persistencia.Impl.JogadorProjetoPersistenciaImpl import JogadorProjetoPersistenciaImpl
 from Intermediario.Persistencia.Impl.ProjetoFreelancePersistenciaImpl import ProjetoFreelancePersistenciaImpl
 from Intermediario.Persistencia.Entidade.JogadorProjeto import JogadorProjeto
+# --- NOVAS IMPORTAÇÕES ---
 from Iniciante.Service.Impl.JogadorServiceImpl import JogadorServiceImpl
 from Intermediario.Service.Impl.ClienteServiceImpl import ClienteServiceImpl
 
 class JogadorProjetoServiceImpl(JogadorProjetoService):
     def __init__(self):
         self.persistencia = JogadorProjetoPersistenciaImpl()
-        self.projeto_persistencia = ProjetoFreelancePersistenciaImpl() 
-        self.jogador = JogadorServiceImpl()
+        self.projeto_persistencia = ProjetoFreelancePersistenciaImpl()
+        # --- NOVAS DEPENDÊNCIAS ---
+        self.jogador_service = JogadorServiceImpl()
         self.cliente_service = ClienteServiceImpl()
 
     def aceitar_projeto(self, jogador, projeto):
@@ -18,10 +20,12 @@ class JogadorProjetoServiceImpl(JogadorProjetoService):
         Contém a lógica de negócio para aceitar um projeto.
         Retorna True se o projeto foi aceito com sucesso, False caso contrário.
         """
+        # 1. Regra de Negócio: Verifica se o jogador já tem um projeto ativo.
         if self.buscar_projeto_ativo(jogador.get_id_jogador()):
             print("[SERVICE LOGIC] Falha: Jogador já possui um projeto ativo.")
             return False
 
+        # 2. Regra de Negócio: Verifica se o jogador tem os requisitos de skill.
         tem_req = (jogador.get_backend() >= projeto.get_req_backend() and
                    jogador.get_frontend() >= projeto.get_req_frontend() and
                    jogador.get_social() >= projeto.get_req_social())
@@ -30,13 +34,24 @@ class JogadorProjetoServiceImpl(JogadorProjetoService):
             print("[SERVICE LOGIC] Falha: Skills insuficientes.")
             return False
             
-        nova_relacao = JogadorProjeto(
-            id_jogador=jogador.get_id_jogador(),
-            id_projeto=projeto.get_id_projeto(),
-            status="em_andamento"
-        )
-        self.persistencia.salvar(nova_relacao)
-        print(f"[SERVICE LOGIC] Sucesso: Contrato '{projeto.get_titulo()}' aceito.")
+        # --- LÓGICA CORRIGIDA ---
+        # 3. Verifica se já existe uma relação (ex: com status 'desistiu')
+        relacao_existente = self.persistencia.buscar(jogador.get_id_jogador(), projeto.get_id_projeto())
+        
+        if relacao_existente:
+            # Se já existe, apenas atualiza o status para 'em_andamento'
+            print(f"[SERVICE LOGIC] Reativando contrato '{projeto.get_titulo()}'.")
+            self.persistencia.atualizar_status(jogador.get_id_jogador(), projeto.get_id_projeto(), "em_andamento")
+        else:
+            # Se não existe, cria uma nova relação
+            print(f"[SERVICE LOGIC] Criando novo contrato '{projeto.get_titulo()}'.")
+            nova_relacao = JogadorProjeto(
+                id_jogador=jogador.get_id_jogador(),
+                id_projeto=projeto.get_id_projeto(),
+                status="em_andamento"
+            )
+            self.persistencia.salvar(nova_relacao)
+        
         return True
 
     def buscar_projeto_ativo(self, id_jogador):
@@ -51,7 +66,7 @@ class JogadorProjetoServiceImpl(JogadorProjetoService):
 
     def finalizar_projeto(self, jogador, projeto):
         """
-        Finaliza um projeto, atualiza o status e adiciona a recompensa.
+        Finaliza um projeto, atualiza o status e adiciona a recompensa, salvando no banco.
         """
         print(f"O projeto '{projeto.get_titulo()}' foi entregue com sucesso!")
         # 1. Atualiza o status do projeto no banco para 'concluido'
@@ -60,7 +75,9 @@ class JogadorProjetoServiceImpl(JogadorProjetoService):
         # 2. Adiciona a recompensa ao dinheiro do jogador
         novo_dinheiro = jogador.get_dinheiro() + projeto.get_recompensa()
         jogador.set_dinheiro(novo_dinheiro)
-        self.jogador.atualizar_jogador(jogador)
+        
+        # 3. Salva o estado atualizado do jogador no banco de dados
+        self.jogador_service.atualizar_jogador(jogador) # Supondo que este método exista
         print(f"Recompensa de R$ {projeto.get_recompensa():.2f} adicionada. Saldo atual: R$ {novo_dinheiro:.2f}")
 
     def desistir_projeto(self, jogador, projeto):
@@ -79,4 +96,3 @@ class JogadorProjetoServiceImpl(JogadorProjetoService):
             cliente.set_reputacao(nova_reputacao)
             self.cliente_service.atualizar_cliente(cliente)
             print(f"Penalidade aplicada. Nova reputação com {cliente.get_nome()}: {nova_reputacao:.1f}")
-
