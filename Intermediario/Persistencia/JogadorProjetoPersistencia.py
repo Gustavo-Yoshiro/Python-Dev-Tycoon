@@ -13,3 +13,7 @@ class JogadorProjetoPersistencia(ABC):
     @abstractmethod
     def atualizar_status(self, id_jogador, id_projeto, novo_status):
         pass
+
+    @abstractmethod
+    def buscar(self, id_jogador: int, id_projeto: int):
+        pass
