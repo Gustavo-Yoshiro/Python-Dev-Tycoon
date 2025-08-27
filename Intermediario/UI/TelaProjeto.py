@@ -65,11 +65,11 @@ class TelaProjeto(Janela):
         y = rect.y
         for linha in linhas:
             if y + fonte.get_height() > rect.bottom:
-                break
+                break # Impede que o texto vaze para fora da área
             linha_surf = fonte.render(linha, True, cor)
             tela.blit(linha_surf, (rect.x, y))
-            y += fonte.get_height()
-        return y
+            y += fonte.get_height() # Move para a próxima linha
+        return y # Retorna a posição Y final para o próximo desenho
 
     def desenhar_conteudo(self, tela):
         mouse_pos = pygame.mouse.get_pos()
@@ -105,11 +105,12 @@ class TelaProjeto(Janela):
         info_y = area_cliente.bottom + 15
         pygame.draw.line(tela, self.COR_TEXTO_PRIMARIO, (self.rect.x + 20, info_y), (self.rect.right - 20, info_y), 1)
         
-        desc_surf = self.fonte_h2.render(f"Briefing: {self.projeto.get_descricao()}", True, self.COR_TEXTO_CORPO)
-        tela.blit(desc_surf, (self.rect.x + 20, info_y + 10))
+        # CORREÇÃO AQUI: Usa a função de quebra de linha para o briefing
+        briefing_rect = pygame.Rect(self.rect.x + 20, info_y + 10, self.rect.width - 40, 60) # Área definida para o briefing
+        y_apos_briefing = self.desenhar_texto_quebra_linha(tela, f"Briefing: {self.projeto.get_descricao()}", briefing_rect, self.fonte_h2, self.COR_TEXTO_CORPO)
         
         if self.detalhes_adicionais:
-            detalhes_rect = pygame.Rect(self.rect.x + 20, info_y + 40, self.rect.width - 40, 60)
+            detalhes_rect = pygame.Rect(self.rect.x + 20, y_apos_briefing + 10, self.rect.width - 40, 60)
             self.desenhar_texto_quebra_linha(tela, self.detalhes_adicionais, detalhes_rect, self.fonte_corpo, self.COR_TEXTO_SECUNDARIO)
 
         # --- Seção 3: Terminal de Chat ---

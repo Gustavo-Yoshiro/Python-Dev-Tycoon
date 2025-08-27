@@ -2,7 +2,6 @@ import pygame
 from Intermediario.UI.Janela import Janela
 
 class TelaDesenvolvimento(Janela):
-    # ATUALIZAÇÃO: Adicionado 'callback_entregar'
     def __init__(self, largura_tela, altura_tela, projeto, cliente, callback_validar, callback_entregar, callback_desistir):
         
         painel_w = int(largura_tela * 0.8)
@@ -20,7 +19,7 @@ class TelaDesenvolvimento(Janela):
         self.projeto = projeto
         self.cliente = cliente
         self.callback_validar = callback_validar
-        self.callback_entregar = callback_entregar # <-- NOVO
+        self.callback_entregar = callback_entregar
         self.callback_desistir = callback_desistir
 
         # Paleta de Cores e Fontes
@@ -53,6 +52,7 @@ class TelaDesenvolvimento(Janela):
         self.feedback_resumido = "Terminal de Validação. Pressione 'Executar Testes'."
         self.testes_passaram = False
         
+        # Lógica do Popup de Saída
         self.popup_saida = False
         self._popup_btn_rect = None
         self.rect_info_saida = None
@@ -65,15 +65,33 @@ class TelaDesenvolvimento(Janela):
             self.cursor_visivel = not self.cursor_visivel
 
     def desenhar_texto_quebra_linha(self, tela, texto, rect, fonte, cor):
-        palavras = texto.split(' '); linhas = []; linha_atual = ''
-        for palavra in palavras:
-            if fonte.size(linha_atual + ' ' + palavra)[0] < rect.width: linha_atual += ' ' + palavra
-            else: linhas.append(linha_atual.strip()); linha_atual = palavra
-        linhas.append(linha_atual.strip())
+        """
+        Desenha texto com quebra de linha automática dentro de um retângulo,
+        respeitando parágrafos definidos por '\n'.
+        """
         y = rect.y
-        for linha in linhas:
-            if y + fonte.get_height() > rect.bottom: break
-            linha_surf = fonte.render(linha, True, cor); tela.blit(linha_surf, (rect.x, y)); y += fonte.get_height()
+        paragrafos = texto.splitlines()
+
+        for paragrafo in paragrafos:
+            palavras = paragrafo.split(' ')
+            linha_atual = ''
+            for palavra in palavras:
+                teste_linha = f"{linha_atual} {palavra}".strip()
+                if fonte.size(teste_linha)[0] <= rect.width:
+                    linha_atual = teste_linha
+                else:
+                    if y + fonte.get_height() > rect.bottom: return y
+                    linha_surf = fonte.render(linha_atual, True, cor)
+                    tela.blit(linha_surf, (rect.x, y))
+                    y += fonte.get_height()
+                    linha_atual = palavra
+            
+            if y + fonte.get_height() > rect.bottom: return y
+            linha_surf = fonte.render(linha_atual, True, cor)
+            tela.blit(linha_surf, (rect.x, y))
+            y += fonte.get_height()
+        
+        return y
 
     def _desenhar_popup_saida(self, tela):
         """Desenha o popup com o log detalhado dos testes, igual ao da TelaExercicio."""
@@ -93,8 +111,10 @@ class TelaDesenvolvimento(Janela):
                 surf.blit(self.fonte_popup.render("[...]", True, (220,180,180)), (20, y_popup))
                 break
             cor = self.COR_SUCESSO if "✓" in linha else self.COR_FALHA if "✗" in linha else self.COR_TEXTO_CORPO
-            surf.blit(self.fonte_popup.render(linha, True, cor), (20, y_popup))
-            y_popup += 24
+            
+            area_linha_popup = pygame.Rect(20, y_popup, largura - 40, altura - y_popup - 20)
+            y_popup = self.desenhar_texto_quebra_linha(surf, linha, area_linha_popup, self.fonte_popup, cor)
+            y_popup += 5
 
         btn_rect = pygame.Rect(largura-110, altura-50, 90, 38)
         pygame.draw.rect(surf, (255, 90, 90), btn_rect, border_radius=12)
@@ -105,8 +125,6 @@ class TelaDesenvolvimento(Janela):
         self._popup_btn_rect = pygame.Rect(popup_x + btn_rect.x, popup_y + btn_rect.y, btn_rect.w, btn_rect.h)
 
     def desenhar_conteudo(self, tela):
-        mouse_pos = pygame.mouse.get_pos()
-        
         briefing_rect = pygame.Rect(self.rect.x + 15, self.rect.y + 40, 350, self.rect.height - 60)
         self.editor_rect = pygame.Rect(briefing_rect.right + 15, self.rect.y + 40, self.rect.width - briefing_rect.width - 45, self.rect.height - 200)
         terminal_rect = pygame.Rect(self.editor_rect.left, self.editor_rect.bottom + 15, self.editor_rect.width, 130)
@@ -132,9 +150,9 @@ class TelaDesenvolvimento(Janela):
                 pygame.draw.line(tela, self.COR_TEXTO_PRIMARIO, (cursor_x, y_linha), (cursor_x, y_linha + self.fonte_code.get_height()), 2)
             y_linha += self.fonte_code.get_height()
 
-        # --- Painel do Terminal (Refatorado) ---
+        # --- Painel do Terminal ---
         pygame.draw.rect(tela, self.COR_FUNDO_EDITOR, terminal_rect)
-        cor_feedback = self.COR_SUCESSO if self.testes_passaram else self.COR_FALHA if self.resultados_testes else self.COR_TEXTO_CORPO
+        cor_feedback = self.COR_SUCESSO if self.testes_passaram else self.COR_FALHA if len(self.resultados_testes) > 0 else self.COR_TEXTO_CORPO
         feedback_surf = self.fonte_terminal.render(self.feedback_resumido, True, cor_feedback)
         tela.blit(feedback_surf, (terminal_rect.x + 10, terminal_rect.y + 10))
 
@@ -174,32 +192,23 @@ class TelaDesenvolvimento(Janela):
             self._desenhar_popup_saida(tela)
 
     def _get_posicao_cursor_pelo_mouse(self, pos_mouse):
-        """Calcula a posição do cursor (índice do caractere) com base na posição X do mouse."""
         linha_texto = self.linhas_codigo[self.linha_ativa]
         pos_x_relativa = pos_mouse[0] - (self.editor_rect.x + 10)
-        
-        melhor_distancia = float('inf')
-        melhor_indice = 0
-        
+        melhor_distancia, melhor_indice = float('inf'), 0
         for i in range(len(linha_texto) + 1):
-            sub_texto = linha_texto[:i]
-            largura_sub_texto = self.fonte_code.size(sub_texto)[0]
+            largura_sub_texto = self.fonte_code.size(linha_texto[:i])[0]
             distancia = abs(pos_x_relativa - largura_sub_texto)
-            
             if distancia < melhor_distancia:
-                melhor_distancia = distancia
-                melhor_indice = i
+                melhor_distancia, melhor_indice = distancia, i
             else:
                 break
-                
         return melhor_indice
 
     def tratar_eventos_conteudo(self, eventos):
         if self.popup_saida:
             for evento in eventos:
                 if self._popup_btn_rect and evento.type == pygame.MOUSEBUTTONUP and evento.button == 1:
-                    if self._popup_btn_rect.collidepoint(evento.pos):
-                        self.popup_saida = False
+                    if self._popup_btn_rect.collidepoint(evento.pos): self.popup_saida = False
             return
 
         for evento in eventos:
@@ -210,20 +219,12 @@ class TelaDesenvolvimento(Janela):
                     self.resultados_testes = resultado_validacao["resultados"]
                     self.testes_passaram = resultado_validacao["sucesso"]
                     self.feedback_resumido = "Sucesso: Todos os testes passaram!" if self.testes_passaram else "Falha: Verifique o log de testes."
-                
-                # ATUALIZAÇÃO: Chama o callback de entregar
                 elif self.testes_passaram and self.botao_entregar_rect.collidepoint(evento.pos):
-                    self.callback_entregar(self.projeto)
-                    self.deve_fechar = True
-                
-                # ATUALIZAÇÃO: Chama o callback de desistir
+                    self.callback_entregar(self.projeto); self.deve_fechar = True
                 elif self.botao_desistir_rect.collidepoint(evento.pos):
-                    self.callback_desistir(self.projeto)
-                    self.deve_fechar = True
-
+                    self.callback_desistir(self.projeto); self.deve_fechar = True
                 elif self.rect_info_saida and self.rect_info_saida.collidepoint(evento.pos):
                     self.popup_saida = True
-
                 elif self.editor_rect.collidepoint(evento.pos):
                     self.input_ativo = True
                     clique_y = evento.pos[1] - (self.editor_rect.y + 10)
@@ -240,8 +241,7 @@ class TelaDesenvolvimento(Janela):
                     parte_restante = linha_atual[self.cursor_pos:]
                     self.linhas_codigo[self.linha_ativa] = linha_atual[:self.cursor_pos]
                     self.linhas_codigo.insert(self.linha_ativa + 1, parte_restante)
-                    self.linha_ativa += 1
-                    self.cursor_pos = 0
+                    self.linha_ativa += 1; self.cursor_pos = 0
                 elif evento.key == pygame.K_UP:
                     self.linha_ativa = max(0, self.linha_ativa - 1)
                     self.cursor_pos = min(self.cursor_pos, len(self.linhas_codigo[self.linha_ativa]))
@@ -252,9 +252,12 @@ class TelaDesenvolvimento(Janela):
                     self.cursor_pos = max(0, self.cursor_pos - 1)
                 elif evento.key == pygame.K_RIGHT:
                     self.cursor_pos = min(len(linha_atual), self.cursor_pos + 1)
+                elif evento.key == pygame.K_TAB:
+                    self.linhas_codigo[self.linha_ativa] = linha_atual[:self.cursor_pos] + '    ' + linha_atual[self.cursor_pos:]
+                    self.cursor_pos += 4
                 else:
                     self.linhas_codigo[self.linha_ativa] = linha_atual[:self.cursor_pos] + evento.unicode + linha_atual[self.cursor_pos:]
-                    self.cursor_pos += 1
+                    self.cursor_pos += len(evento.unicode)
 
     def tratar_eventos(self, eventos):
         super().tratar_eventos(eventos)
