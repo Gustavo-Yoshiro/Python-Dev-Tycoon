@@ -4,18 +4,19 @@ import random
 from datetime import datetime
 
 # --- Importações de Entidades e Serviços ---
+# Certifique-se de que os caminhos de importação correspondem à sua estrutura de pastas
 from Iniciante.Persistencia.Entidade.Jogador import Jogador
 from Intermediario.Persistencia.Entidade.ProjetoFreelance import ProjetoFreelance
 from Intermediario.Service.Impl.ProjetoFreelanceServiceImpl import ProjetoFreelanceServiceImpl
 from Intermediario.Service.Impl.ClienteServiceImpl import ClienteServiceImpl
 from Iniciante.Service.Impl.JogadorServiceImpl import JogadorServiceImpl
 from Intermediario.Service.Impl.JogadorProjetoServiceImpl import JogadorProjetoServiceImpl
-from Intermediario.Service.ValidacaoService import ValidacaoServiceImpl
+# from Intermediario.Service.Impl.ValidacaoServiceImpl import ValidacaoServiceImpl # Para o futuro IDE
 
 # --- Importações das Janelas de UI ---
 from Intermediario.UI.TelaFreelance import TelaFreelance
-from Intermediario.UI.TelaDesenvolvimento import TelaDesenvolvimento
-# Adicione a importação da sua Janela base
+from Intermediario.UI.TelaProjeto import TelaProjeto
+# from Intermediario.UI.TelaDesenvolvimento import TelaDesenvolvimento # Para o futuro IDE
 from Intermediario.UI.Janela import Janela
 
 
@@ -42,7 +43,7 @@ def main():
     cliente_service = ClienteServiceImpl()
     jogador_service = JogadorServiceImpl()
     jogador_projeto_service = JogadorProjetoServiceImpl()
-    validacao_service = ValidacaoServiceImpl()
+    # validacao_service = ValidacaoServiceImpl() # Para o futuro IDE
 
     # Carrega o jogador atual do banco de dados
     JOGADOR_ATUAL = jogador_service.buscar_jogador_por_id(1)
@@ -63,48 +64,60 @@ def main():
         
         projeto_ativo = jogador_projeto_service.buscar_projeto_ativo(JOGADOR_ATUAL.get_id_jogador())
         
-        projetos_disponiveis = []
+        projetos_info = []
         if not projeto_ativo:
-            projetos_disponiveis = projeto_service.listar_disponiveis()
+            # Usa o serviço refatorado para obter a lista de projetos com o status de requisitos
+            projetos_info = projeto_service.listar_projetos_para_jogador(JOGADOR_ATUAL)
 
         janela = TelaFreelance(
             LARGURA, ALTURA,
             projeto_ativo=projeto_ativo,
-            projetos_disponiveis=projetos_disponiveis,
-            jogador=JOGADOR_ATUAL,
+            projetos_info=projetos_info,
             cliente_service=cliente_service,
-            callback_abrir_dev=abrir_janela_desenvolvimento,
-            callback_ver_detalhes=abrir_janela_desenvolvimento # Ambos os callbacks levam para o IDE
+            callback_abrir_desenvolvimento=abrir_janela_detalhes # Clicar em um projeto abre os detalhes
         )
         janelas_abertas.append(janela)
 
-    def abrir_janela_desenvolvimento(projeto):
-        """Abre o IDE para trabalhar em um projeto."""
+    def abrir_janela_detalhes(projeto):
+        """Abre o Dossiê de Contrato (Painel de Análise Estratégica)."""
         janelas_abertas.clear()
+        
         cliente = cliente_service.buscar_cliente_por_id(projeto.get_id_cliente())
         
-        janela = TelaDesenvolvimento(
+        janela = TelaProjeto(
             LARGURA, ALTURA,
             projeto=projeto,
             cliente=cliente,
-            callback_validar=validar_solucao_jogador,
-            callback_desistir=abrir_janela_freelance # Desistir volta para a lista
+            jogador=JOGADOR_ATUAL,
+            callback_aceitar=aceitar_projeto,
+            callback_voltar=abrir_janela_freelance
         )
         janelas_abertas.append(janela)
 
-    def validar_solucao_jogador(projeto, codigo_jogador):
-        """Função chamada pelo botão 'Executar Testes' no IDE."""
-        print("Validando código...")
-        resultado = validacao_service.validar_solucao(projeto, codigo_jogador)
-        
-        if resultado["sucesso"]:
-            print("Todos os testes passaram! Projeto concluído!")
-            # Lógica para finalizar o projeto, dar recompensa, etc.
-            # Ex: jogador_projeto_service.finalizar_projeto(JOGADOR_ATUAL.get_id_jogador(), projeto.get_id_projeto())
-        else:
-            print("Falha nos testes.")
+    def aceitar_projeto(projeto):
+        """Lógica final para aceitar um contrato, chamada pela TelaProjeto."""
+        # 1. Checa se o jogador já tem um projeto ativo
+        if jogador_projeto_service.buscar_projeto_ativo(JOGADOR_ATUAL.get_id_jogador()):
+            print("ERRO: Jogador já possui um projeto ativo.")
+            # Idealmente, mostrar uma mensagem visual para o jogador
+            return
+
+        # 2. Checa se o jogador tem os requisitos de skill
+        tem_req = (JOGADOR_ATUAL.get_backend() >= projeto.get_req_backend() and
+                   JOGADOR_ATUAL.get_frontend() >= projeto.get_req_frontend() and
+                   JOGADOR_ATUAL.get_social() >= projeto.get_req_social())
+
+        if not tem_req:
+            print("SKILLS INSUFICIENTES! Não é possível aceitar este contrato.")
+            return
             
-        return resultado # Retorna o dicionário completo com o log
+        # 3. Se tudo estiver certo, aceita o projeto
+        # (Aqui você chamaria o service para criar a relação jogador_projeto no banco)
+        print(f"Contrato '{projeto.get_titulo()}' aceito com sucesso!")
+        jogador_projeto_service(aceitar_projeto(projeto))
+        
+        # 4. Volta para a tela de freelance, que agora mostrará o painel de projeto ativo
+        abrir_janela_freelance()
 
     # --- Callbacks do Menu Principal ---
     callbacks_principais = {
