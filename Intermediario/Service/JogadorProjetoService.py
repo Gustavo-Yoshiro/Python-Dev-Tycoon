@@ -15,6 +15,13 @@ class JogadorProjetoService(ABC):
         Busca o projeto que está atualmente 'em_andamento' para um jogador.
         """
         pass
+    
+    @abstractmethod
+    def desbloquear_detalhes(self, id_jogador, id_projeto, detalhes):
+        """
+        Salva os detalhes que o jogador descobriu sobre um projeto.
+        """
+        pass
 
     @abstractmethod
     def finalizar_projeto(self, jogador, projeto):
