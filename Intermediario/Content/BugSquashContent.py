@@ -66,166 +66,292 @@ def _sample_mix(pool: List[Row], size: int, min_bugs: int = 2) -> List[Row]:
 def _pool_print() -> Tuple[List[Row], str]:
     hint = "Foque em print(): parênteses/aspas corretos; nada de misturar str com int sem conversão."
     base = [
-        _row("print('Olá')", False, "Sintaxe correta."),
-        _row("print(1+2)", False, "Expressão válida."),
+        _row("print('Olá')", False, "OK."),
+        _row("print(1+2)", False, "OK."),
         _row("print('Fim')", False, "OK."),
-        _row("print('a', 1)", False, "Múltiplos argumentos são válidos."),
+        _row("print('a', 1)", False, "OK."),
         _row("print('Resposta:', 42)", False, "OK."),
-
-        _row("prit('Olá')", True, "Função errada: 'print'."),
-        _row("print(Olá)", True, "Strings requerem aspas."),
+        _row("prit('Olá')", True, "Nome da função errado."),
+        _row("print(Olá)", True, "Strings precisam de aspas."),
         _row("print('Ola)", True, "Aspas não fechadas."),
         _row("printf('Hello')", True, "Não existe printf() em Python."),
-        _row("print('7'+1)", True, "Mistura str com int sem conversão."),
-        _row("print ('x') )", True, "Parêntese extra."),
+        _row("print('7'+1)", True, "Concatenação str + int."),
+        _row("print 'x'", True, "Sintaxe do Python 2."),
+        _row("print('x') )", True, "Parêntese extra."),
     ]
-
-    # variações programáticas simples
-    words = ["fim", "ok", "python", "teste", "sucesso", "start", "end", "resultado"]
-    nums  = [0, 1, 2, 3, 5, 7, 10, 42]
+    words = ["fim", "ok", "python", "teste", "sucesso"]
+    nums  = [0, 1, 2, 3, 7, 42]
     for w in words:
-        base.append(_row(f"print('{w.upper()}')", False, "OK."))
         base.append(_row(f"print('{w}')", False, "OK."))
+        base.append(_row(f"print('{w.upper()}')", False, "OK."))
         base.append(_row(f"print({len(w)}+{nums[len(w)%len(nums)]})", False, "OK."))
-        base.append(_row(f"print({w})", True, "Variável não definida; use aspas se for texto."))
+        base.append(_row(f"print({w})", True, "Variável indefinida; texto precisa de aspas."))
         base.append(_row(f"print('{w}", True, "Aspas não fechadas."))
     for a in nums:
         b = random.choice(nums)
-        base.append(_row(f"print({a}+{b})", False, "Soma numérica válida."))
-        base.append(_row(f"print('{a}'+{b})", True, "Concatenação str + int causa erro."))
-
-    # pequenos multi-linhas
-    base += [
-        _row("msg = 'oi'\nprint(msg)", False, "Variável definida e usada corretamente."),
-        _row("msg = 'oi\nprint(msg)", True, "Aspas não fechadas quebram o código."),
-    ]
-
+        base.append(_row(f"print({a}+{b})", False, "OK."))
+        base.append(_row(f"print('{a}'+{b})", True, "str + int."))
     return _dedup_rows(base), hint
+
 
 def _pool_input() -> Tuple[List[Row], str]:
-    hint = "input() usa parênteses; converta para int/float quando for somar números."
+    hint = "input() usa parênteses; converta para int/float quando precisar de número."
     base = [
         _row("nome = input('Nome: ')", False, "OK."),
-        _row("print(nome)", False, "OK."),
         _row("x = input('Digite: ')", False, "OK."),
-        _row("idade = int(input('Idade: '))", False, "Conversão para int correta."),
-        _row("a = float(input('A: '))\nb = float(input('B: '))\nprint(a+b)", False, "Soma de floats OK."),
-
+        _row("idade = int(input('Idade: '))", False, "Conversão correta."),
+        _row("peso = float(input('Peso: '))", False, "Conversão correta."),
+        _row("a = input('A: ')\nb = input('B: ')", False, "Duas leituras (strings)."),
         _row("nome = input 'Nome: '", True, "Faltam parênteses."),
         _row("imput('Cidade: ')", True, "input() escrito errado."),
-        _row("print(nome))", True, "Parêntese extra."),
-        _row("print(nome+1)", True, "Concatenação str + int."),
-        _row("input(print('x'))", True, "Chamada aninhada desnecessária."),
-        _row("soma = input('a: ') + input('b: ')", True, "Sem conversão: concatena strings."),
-        _row("idade = int(input('Idade: '))\nprint('Idade: ' + idade)", True, "Concatenação str + int."),
+        _row("n = int(input('n: ')", True, "Parêntese não fechado."),
+        _row("total = input('t: ')\ntotal = total + 1", True, "str + int."),
+        _row("soma = input('a: ') + input('b: ')", True, "Concatena strings sem conversão."),
+        _row("x = floatinput('x: ')", True, "Função inexistente."),
+        _row("idade = int input('Idade: ')", True, "Sintaxe inválida."),
     ]
     return _dedup_rows(base), hint
 
+
 def _pool_variaveis() -> Tuple[List[Row], str]:
-    hint = "Atribuição usa '='; cuidado com tipos e nomes válidos."
+    hint = "Atribuição usa '='; nomes válidos; cuidado com tipos."
     base = [
         _row("x = 5", False, "OK."),
         _row("y = 'Python'", False, "OK."),
-        _row("x, y = 1, 2", False, "Atribuição múltipla válida."),
-        _row("print(x)", False, "OK."),
-        _row("x += 3", False, "Atribuição composta válida (após definir x)."),
-
+        _row("x, y = 1, 2", False, "OK."),
+        _row("ativo = True", False, "OK."),
+        _row("saldo = 0", False, "OK."),
         _row("x == 5", True, "Comparação, não atribuição."),
-        _row("y = 3 + '2'", True, "Mistura int e str."),
-        _row("print(x", True, "Parêntese não fechado."),
-        _row("x := 5", True, "Walrus não substitui '=' na definição isolada."),
-        _row("y =+ 2", True, "Provável erro: queria '+='."),
-        _row("print(z)", True, "Variável indefinida."),
-        _row("class = 3", True, "Palavra reservada não pode ser nome."),
+        _row("1x = 3", True, "Nome inválido."),
+        _row("class = 3", True, "Palavra reservada."),
+        _row("y = 3 + '2'", True, "str + int."),
+        _row("saldo += 1", True, "Variável possivelmente indefinida."),
+        _row("x := 5", True, "Não use ':=' para definir isoladamente aqui."),
+        _row("z", True, "Referência sem atribuição."),
+        _row("total = 0; total = total + '1'", True, "str + int."),
     ]
-    # variações
-    names = ["total", "contador", "msg", "ativo", "saldo"]
-    for n in names:
-        base.append(_row(f"{n} = 0\n{n} = {n} + 1", False, "Atualização de variável OK."))
-        base.append(_row(f"{n} = {n} + '1'", True, "Mistura str e int."))
     return _dedup_rows(base), hint
+
 
 def _pool_operadores() -> Tuple[List[Row], str]:
-    hint = "Use '>=', '==', '!='; nada de '=>' ou '=' para comparar."
+    hint = ">=, ==, !=; nada de '=>' ou '=' para comparar."
     base = [
-        _row("x = 3\ny = 5\nprint(x + y)", False, "Soma correta."),
-        _row("print(3 * 2 + 1)", False, "Precedência OK."),
-        _row("print(10 // 3)", False, "Divisão inteira OK."),
-        _row("print(5 % 2)", False, "Módulo OK."),
-        _row("print(3 >= 2)", False, "Comparação válida."),
-        _row("print(3 == 3)", False, "Comparação válida."),
-        _row("print(True and False)", False, "Operador lógico válido."),
-
-        _row("print(3 => 2)", True, "Operador inválido: use '>='."),
+        _row("print(3 + 5 * 2)", False, "OK."),
+        _row("print(10 // 3)", False, "OK."),
+        _row("print(5 % 2)", False, "OK."),
+        _row("print(3 >= 2)", False, "OK."),
+        _row("print(True and False)", False, "OK."),
+        _row("print(3 => 2)", True, "Use '>='."),
         _row("print(3 = 2)", True, "Use '==' para comparar."),
-        _row("print(3 >== 2)", True, "Operador inválido."),
-        _row("print('3' - 1)", True, "Subtração entre str e int não existe."),
+        _row("print('3' - 1)", True, "str - int."),
         _row("print(> 3)", True, "Falta operando."),
+        _row("print(3 >== 2)", True, "Operador inválido."),
     ]
     return _dedup_rows(base), hint
+
 
 def _pool_if() -> Tuple[List[Row], str]:
-    hint = "if/else: termine cabeçalho com ':'; parênteses são opcionais; use print() correto."
+    hint = "if/else: termine cabeçalho com ':'; indentação obrigatória; parênteses são opcionais."
     base = [
-        _row("idade = 18\nif idade >= 18:\n    print('maior')\nelse:\n    print('menor')", False, "Estrutura if/else correta."),
-        _row("x = 7\nif x % 2 == 0:\n    print('par')\nelse:\n    print('impar')", False, "Uso de % e if/else OK."),
-        _row("n = 10\nif n:\n    print('verdadeiro')", False, "Qualquer não zero é True."),
-
+        _row("if 10 > 5:\n    print('ok')", False, "OK."),
+        _row("if 'py'.startswith('p'):\n    print('sim')", False, "OK."),
+        _row("if 0:\n    print('nunca')", False, "OK (condição falsa)."),
         _row("if idade >= 18", True, "Falta ':' no cabeçalho."),
-        _row("if idade => 18:", True, "Operador inválido, use '>='."),
-        _row("print 'maior'", True, "print() precisa de parênteses."),
-        _row("else", True, "Falta ':' e bloco após else."),
-        _row("iff idade >= 18:", True, "Palavra-chave errada."),
-        _row("if (x == 3):\nprint('ok')", True, "Indentação obrigatória dentro do bloco."),
         _row("if x = 3:\n    print('ok')", True, "Use '==' para comparar."),
+        _row("iff x>0:", True, "Palavra-chave errada."),
+        _row("else:", True, "else sem if correspondente."),
+        _row("if (x == 3):\nprint('ok')", True, "Sem indentação do corpo."),
+        _row("if True: print 'x'", True, "print sem parênteses."),
     ]
     return _dedup_rows(base), hint
 
-def _pool_for() -> Tuple[List[Row], str]:
-    hint = "for + range(): use parênteses e ':'; lembre de print() com parênteses."
-    base = [
-        _row("for i in range(3):\n    print(i)\nprint('FIM')", False, "Laço for com range e print OK."),
-        _row("for c in 'py':\n    print(c)", False, "Iterando sobre string OK."),
-        _row("for i in range(1, 4):\n    print(i)", False, "Faixa 1..3 OK."),
 
+def _pool_for() -> Tuple[List[Row], str]:
+    hint = "for + range(): use parênteses e ':'; corpo indentado na linha de baixo."
+    base = [
+        _row("for i in range(3):\n    print(i)", False, "OK."),
+        _row("for c in 'py':\n    print(c)", False, "OK."),
+        _row("for i in range(1, 4):\n    print(i)", False, "OK."),
         _row("for i in range 3:", True, "Faltam parênteses em range()."),
         _row("for i = 0..2:", True, "Sintaxe não-Python."),
         _row("for(i in range(3)):", True, "Mistura com C."),
-        _row("print i", True, "print() precisa de parênteses."),
         _row("for i in range(3)", True, "Falta ':' no cabeçalho."),
         _row("for i in 3:\n    print(i)", True, "Não se itera inteiro."),
     ]
     return _dedup_rows(base), hint
 
-def _pool_while() -> Tuple[List[Row], str]:
-    hint = "while ...: termine com ':'; atualize a variável para não travar; nada de 'i ++'."
-    base = [
-        _row("i = 0\nwhile i < 3:\n    print(i)\n    i += 1", False, "Laço com incremento OK."),
-        _row("i = 3\nwhile i:\n    print(i)\n    i -= 1", False, "Condição verdade: qualquer não zero."),
 
+def _pool_while() -> Tuple[List[Row], str]:
+    hint = "while ...: termine com ':'; corpo indentado na linha de baixo."
+    base = [
+        _row("while True:\n    break", False, "OK (exemplo mínimo)."),
+        _row("while 1:\n    break", False, "OK."),
         _row("while i < 3", True, "Falta ':' no cabeçalho."),
-        _row("i = i + '1'", True, "Mistura int e str."),
-        _row("print(i))", True, "Parêntese extra."),
-        _row("i ++", True, "Não existe ++ em Python."),
-        _row("whille i < 3:", True, "Palavra-chave errada."),
-        _row("i = 0\nwhile i < 3:\n    print(i)", True, "Sem incremento: laço infinito."),
-        _row("while i = 3:\n    print(i)", True, "Use '==' para comparar."),
+        _row("i ++", True, "Não existe '++' em Python."),
+        _row("whille i < 3:\n    pass", True, "Palavra-chave errada."),
+        _row("while i = 3:\n    pass", True, "Use '==' para comparar."),
     ]
     return _dedup_rows(base), hint
 
-def _pool_funcoes() -> Tuple[List[Row], str]:
-    hint = "def nome(args): e return; chamadas com parênteses; escreva 'return' corretamente."
-    base = [
-        _row("def soma(a, b):\n    return a + b\nprint(soma(2, 3))", False, "Definição e chamada corretas."),
-        _row("def eco(s):\n    print(s)\neco('oi')", False, "Função sem retorno explícito é OK."),
-        _row("def dobro(x=2):\n    return x*2\nprint(dobro())", False, "Default em parâmetro OK."),
 
+def _pool_funcoes() -> Tuple[List[Row], str]:
+    hint = "def nome(args): e return; corpo indentado na linha de baixo."
+    base = [
+        _row("def f():\n    return 1", False, "OK."),
+        _row("def soma(a,b):\n    return a+b", False, "OK."),
+        _row("def eco(s):\n    return s", False, "OK."),
         _row("def soma(a, b)", True, "Falta ':' no cabeçalho."),
-        _row("return a + b)", True, "Parêntese extra; e 'return' deve estar dentro da função."),
+        _row("def f(x):\nreturn x", True, "Falta indentação no corpo."),
+        _row("def soma: (a,b)", True, "Sintaxe inválida."),
+        _row("retun 1", True, "Ortografia de 'return'."),
         _row("print soma(2,3)", True, "Chamada sem parênteses."),
-        _row("def soma: (a,b)", True, "Sintaxe inválida para parâmetros."),
-        _row("retun a+b", True, "Erro de ortografia em 'return'."),
-        _row("def f(x):\nreturn x", True, "Indentação obrigatória no corpo."),
+    ]
+    return _dedup_rows(base), hint
+
+
+def _pool_fstrings_formatacao() -> Tuple[List[Row], str]:
+    hint = "f-strings: f'...{expr}...'; .format(...); especificadores (:.2f, :>5); chaves devem fechar."
+    base = [
+        _row("nome = 'Ana'; print(f'Olá, {nome}')", False, "OK."),
+        _row("x = 3.14159; print(f'{x:.2f}')", False, "OK."),
+        _row("a, b = 2, 3; print(f'{a}+{b}={a+b}')", False, "OK."),
+        _row("print('Olá, {}'.format('mundo'))", False, "OK."),
+        _row("print('{:>5}'.format(7))", False, "OK."),
+        _row("x = 10; print(f'{{ok}} {x}')", False, "Chaves literais."),
+        _row("print(f'Olá, {nome')", True, "Chave não fechada."),
+        _row("x = 3.14; print(f'{x:2f}')", True, "Formato inválido; use :.2f."),
+        _row("print('Olá, {nome}'.format())", True, "Placeholder sem argumento."),
+        _row("print('{:d}'.format('3'))", True, "Tipo errado para {:d}."),
+        _row("print('%d' % '3')", True, "Tipo errado para %d."),
+        _row("a, b = 1, 2; print(f'Total: {a+b')", True, "Falta fechar }."),
+        _row("x = 5; print(f'{x:}')", True, "Especificador incompleto."),
+    ]
+    return _dedup_rows(base), hint
+
+
+def _pool_metodos_string() -> Tuple[List[Row], str]:
+    hint = "Principais métodos: lower/upper/strip/split/join/replace/startswith/endswith/isdigit."
+    base = [
+        _row("s = ' Py '\nprint(s.strip())", False, "strip() remove espaços nas pontas."),
+        _row("print('py'.upper())", False, "OK."),
+        _row("print('PY'.lower())", False, "OK."),
+        _row("print('a-b-c'.split('-'))", False, "OK."),
+        _row("print('-'.join(['a','b','c']))", False, "OK."),
+        _row("print('abc'.replace('b','x'))", False, "OK."),
+        _row("print('python'.startswith('py'))", False, "OK."),
+        _row("print('file.txt'.endswith('.txt'))", False, "OK."),
+        _row("print('123'.isdigit())", False, "OK."),
+        _row("s = 123; print(s.lower())", True, "lower() em int."),
+        _row("print('a-b'.split)", True, "Faltou chamar split()."),
+        _row("lista = ['a','b']; print(lista.join('-'))", True, "join é de string."),
+        _row("print('-'.join('a','b'))", True, "join aceita 1 iterável."),
+        _row("print('abc'.repl('b','x'))", True, "Método inexistente."),
+        _row("print('abc'.split(None, '1'))", True, "maxsplit deve ser int."),
+        _row("print('abc'.find('a') = 0)", True, "Atribuição em chamada."),
+    ]
+    return _dedup_rows(base), hint
+
+
+def _pool_listas() -> Tuple[List[Row], str]:
+    hint = "Listas: [], append/extend/insert/pop/remove, sort/reverse, slicing."
+    base = [
+        _row("l = [1,2]; l.append(3)", False, "OK."),
+        _row("print([1,2,3][1:])", False, "Slicing."),
+        _row("print([1,2,3][::-1])", False, "Reverse por slicing."),
+        _row("l = [1,2]; l.extend([3,4])", False, "OK."),
+        _row("l = [3,1,2]; l.sort()", False, "OK."),
+        _row("l = [1,2]; l.insert(1,'x')", False, "OK."),
+        _row("x = [1,2,3]; y = x[:]", False, "Cópia por slicing."),
+        _row("l = {}; l.append(1)", True, "{} cria dict, não lista."),
+        _row("l = [1]; l.add(2)", True, "Lista não tem add()."),
+        _row("print([1,2,3][1:5:0])", True, "step=0 inválido."),
+        _row("print([1,2,3][10])", True, "IndexError provável."),
+        _row("l = [3,2]; sort(l)", True, "Use l.sort()."),
+        _row("l = [1,2]; l.extend(3)", True, "extend espera iterável."),
+        _row("print([1,2][::None])", True, "step None inválido."),
+    ]
+    return _dedup_rows(base), hint
+
+
+def _pool_tuplas() -> Tuple[List[Row], str]:
+    hint = "Tuplas são imutáveis; 1 elemento precisa de vírgula: ('x',)."
+    base = [
+        _row("t = (1,2,3); print(t[0])", False, "OK."),
+        _row("a, b = (1, 2)", False, "OK."),
+        _row("t = ('x',)", False, "OK."),
+        _row("t = tuple([1,2])", False, "OK."),
+        _row("t = (1); print(type(t))", True, "(1) é int; faltou vírgula."),
+        _row("t = (1,2); t[0] = 9", True, "Imutável."),
+        _row("t = (1,2); t.append(3)", True, "Tupla não tem append."),
+        _row("a, b = (1,2,3)", True, "Tamanhos diferentes."),
+    ]
+    return _dedup_rows(base), hint
+
+
+def _pool_sets() -> Tuple[List[Row], str]:
+    hint = "Conjuntos: set(), {1,2}; add/remove/discard; união |, interseção &."
+    base = [
+        _row("s = {1,2,3}; s.add(4)", False, "OK."),
+        _row("print(2 in {1,2,3})", False, "OK."),
+        _row("print({1,2} | {2,3})", False, "União."),
+        _row("print({1,2,3} & {2,3})", False, "Interseção."),
+        _row("print(set([1,2,2,3]))", False, "Dedup."),
+        _row("s = {1}; s.discard(99)", False, "OK."),
+        _row("s = {}; s.add(1)", True, "{} é dict, não set()."),
+        _row("s = set(); s.append(1)", True, "Set não tem append()."),
+        _row("s = {1,2}; s.remove(3)", True, "remove erra se não existir."),
+        _row("s = {{1}}", True, "Itens devem ser hashable."),
+        _row("s = {[1,2]}", True, "Lista não é hashable."),
+        _row("print({1,2} + {3})", True, "Use '|', não '+'."),
+    ]
+    return _dedup_rows(base), hint
+
+
+def _pool_dicts() -> Tuple[List[Row], str]:
+    hint = "Dicts: {'k':v}; d['k'], get(), update(); chaves imutáveis."
+    base = [
+        _row("d = {'nome':'Ana','idade':20}; print(d['nome'])", False, "OK."),
+        _row("d = {'n':1}; print(d.get('x',0))", False, "OK."),
+        _row("d = {'idade':20}; d['idade'] = 21", False, "OK."),
+        _row("d = {'a':1}; d.update({'b':2})", False, "OK."),
+        _row("print(list({'x':1}.items()))", False, "OK."),
+        _row("d = {'x':1}; print(d.x)", True, "Use d['x']."),
+        _row("d = [('a',1)]; print(d['a'])", True, "Lista não indexa por chave."),
+        _row("d = {'a':1}; print(d['b'])", True, "KeyError provável."),
+        _row("d = {['a']:1}", True, "Lista não é hashable."),
+        _row("print({1:'a', 1:'b'})", True, "Chave duplicada sobrescreve."),
+    ]
+    return _dedup_rows(base), hint
+
+
+def _pool_list_comprehensions() -> Tuple[List[Row], str]:
+    hint = "List comps: [expr for x in seq if cond]; não confundir com set/dict/generator."
+    base = [
+        _row("nums = [1,2,3]; quad = [n*n for n in nums]", False, "OK."),
+        _row("pares = [n for n in range(6) if n%2==0]", False, "OK."),
+        _row("flat = [x for sub in [[1,2],[3]] for x in sub]", False, "OK."),
+        _row("doubles = [x*2 for x in (1,2,3)]", False, "OK."),
+        _row("[n for n in range(3) if]", True, "if sem condição."),
+        _row("[x for in range(3)]", True, "Faltou variável antes de in."),
+        _row("[x for x range(3)]", True, "Faltou 'in'."),
+        _row("{x for x in [1,1,2]}", True, "Isto é set, não lista."),
+        _row("(x for x in [1,2])", True, "Isto é generator, não lista."),
+        _row("[n* for n in range(3)]", True, "Expressão incompleta."),
+    ]
+    return _dedup_rows(base), hint
+
+
+def _pool_tratamento_erros() -> Tuple[List[Row], str]:
+    hint = "try/except/else/finally; 'except Tipo as e'; 'raise ValueError(...)'; sem 'catch'."
+    base = [
+        _row("raise ValueError('msg')", False, "OK."),
+        _row("int('3')", False, "Conversão válida."),
+        _row("try:\n    1/0", True, "try sem except/finally."),
+        _row("try:\n    pass", True, "try sem except/finally."),
+        _row("catch Exception:", True, "Não existe 'catch' em Python."),
+        _row("raise NotAnError('x')", True, "Classe de exceção inexistente."),
+        _row("try:\n    pass\n", True, "Bloco incompleto."),  # ainda 2 linhas úteis
+        _row("except ValueError, e: pass", True, "Sintaxe Python 2."),
     ]
     return _dedup_rows(base), hint
 
@@ -234,32 +360,74 @@ def _pool_funcoes() -> Tuple[List[Row], str]:
 def get_bug_squash_pool(topic_title: str) -> Tuple[List[Row], str]:
     """
     Retorna o POOL COMPLETO (grande) para o tópico, + hint textual.
+    Roteamento por NOME EXATO normalizado (mesmo padrão da Cobrinha/PyFoot).
     """
     t = _norm(topic_title)
 
-    if "saida de dados" in t or "print" in t:
-        return _pool_print()
+    ROUTER = {
+        _norm("Saída de dados com print()"): _pool_print,
+        _norm("Entrada de dados com input()"): _pool_input,
+        _norm("Variáveis e Tipos Simples"): _pool_variaveis,
+        _norm("Operadores Aritméticos e Relacionais"): _pool_operadores,
+        _norm("Estruturas Condicionais (if/else)"): _pool_if,
+        _norm("Estruturas de Repetição (for)"): _pool_for,
+        _norm("Estrutura de Repetição (while)"): _pool_while,
+        _norm("Funções Simples"): _pool_funcoes,
 
-    if "entrada de dados" in t or "input" in t:
-        return _pool_input()
+        # Fases 9–16
+        _norm("f-strings e formatação"): _pool_fstrings_formatacao,
+        _norm("Métodos de string"): _pool_metodos_string,
+        _norm("Listas (métodos e slicing)"): _pool_listas,
+        _norm("Tuplas e imutabilidade"): _pool_tuplas,
+        _norm("Conjuntos (set)"): _pool_sets,
+        _norm("Dicionários"): _pool_dicts,
+        _norm("List Comprehensions"): _pool_list_comprehensions,
+        _norm("Tratamento de Erros"): _pool_tratamento_erros,
+    }
 
-    if "variaveis" in t or "variavel" in t or "tipos simples" in t:
-        return _pool_variaveis()
+    fn = ROUTER.get(t)
+    if fn:
+        return fn()
 
-    if "operadores" in t or "relacionais" in t or "aritmeticos" in t:
-        return _pool_operadores()
+    # fallback seguro: se vier título errado, cai no "print"
+    return _pool_print()
 
-    if "condicionais" in t or "if/else" in t or "if else" in t or " if " in t or t.startswith("if"):
-        return _pool_if()
+    # ----- NOVOS TÓPICOS (Fases 9–16) -----
+    # Fase 9: f-strings e formatação
+    if ("f-strings" in t or "f strings" in t or "fstring" in t or
+        "formatacao" in t or ".format(" in t or "formatacao de strings" in t or "formatacao" in t):
+        return _pool_fstrings_formatacao()
 
-    if "repeticao (for)" in t or "estrutura de repeticao (for" in t or " for)" in t or " for " in t or t.startswith("for"):
-        return _pool_for()
+    # Fase 10: Métodos de string
+    if ("metodos de string" in t or "metodo de string" in t or
+        "string methods" in t or "strings (metodos" in t or "strings metodos" in t):
+        return _pool_metodos_string()
 
-    if "repeticao (while)" in t or "estrutura de repeticao (while" in t or " while)" in t or " while " in t or t.startswith("while"):
-        return _pool_while()
+    # Fase 15: List Comprehensions (checar ANTES de 'listas' genérico)
+    if ("list comprehension" in t or "list comprehensions" in t or
+        "comprehension" in t or "comprehensions" in t):
+        return _pool_list_comprehensions()
 
-    if "funcoes" in t or "funcoes" in t or "funções" in t or "funcao" in t or "função" in t or "def " in t:
-        return _pool_funcoes()
+    # Fase 11: Listas (métodos e slicing)
+    if ("listas" in t or "lista" in t or "slicing" in t):
+        return _pool_listas()
+
+    # Fase 12: Tuplas e imutabilidade
+    if ("tuplas" in t or "tupla" in t or "imutabilidade" in t or "imutavel" in t):
+        return _pool_tuplas()
+
+    # Fase 13: Conjuntos (set)
+    if ("conjuntos" in t or "conjunto" in t or "set " in t or t.startswith("set")):
+        return _pool_sets()
+
+    # Fase 14: Dicionários
+    if ("dicionarios" in t or "dicionario" in t or "dicion\u00E1rio" in t or "dict" in t):
+        return _pool_dicts()
+
+    # Fase 16: Tratamento de Erros
+    if ("tratamento de erros" in t or "excecoes" in t or "excecao" in t or
+        "exceptions" in t or "try" in t or "except" in t or "raise" in t):
+        return _pool_tratamento_erros()
 
     # fallback
     return _pool_print()

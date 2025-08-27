@@ -32,12 +32,7 @@ class TelaCobraCodigo:
         self.arena  = pygame.Rect(self.prompt.x+32, self.prompt.y+140, arena_w, self.prompt.h-210)
         self.sidebar = pygame.Rect(self.arena.right+12, self.arena.y, self.sidebar_w, self.arena.h)
 
-        # Conteúdo (sequência e distratores com WHY)
-        if sequencia_alvo:
-            seq_raw = sequencia_alvo[:]
-            _, pool_raw = get_cobra_content(self.topico)
-        else:
-            seq_raw, pool_raw = get_cobra_content(self.topico)
+        seq_raw, pool_raw = get_cobra_content(self.topico)
 
         self.seq = [self._tok_txt(t) for t in (seq_raw or [])]  # só strings aqui
         # distratores: guardamos só os textos para spawn, e mapeamos why por texto

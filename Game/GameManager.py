@@ -307,7 +307,7 @@ class GameManager:
     def _pos_resultado(self):
         # Se foi aprovado e é Iniciante (fases 1..8), roda minigame
         fase_id = self.id_fases[self.fase_atual]
-        if self._ultimo_resultado_ok and 1 <= fase_id <= 8:
+        if self._ultimo_resultado_ok and 1 <= fase_id <= 16:
             self.iniciar_minigame()
         else:
             self.avancar_fase()
@@ -363,6 +363,7 @@ class GameManager:
 
         elif tipo == "pyfoot":
             self.sfx = SFXPyFoot(self.audio)
+            #self.sfx.start_ambient(vol=0.45)
             self.tela_minigame = TelaPyFootTactics(
                 largura=self.largura,
                 altura=self.altura,
@@ -374,11 +375,11 @@ class GameManager:
                 sfx=self.sfx
             )
             # torcida SÓ aqui
-            self.sfx.start_ambient(vol=0.45)
+            self.sfx.start_ambient(vol=0.60)
 
         else:  # "hero"
             self.sfx = SFXHero(self.audio)
-            self.sfx.start_ambient(vol=0.48)
+            self.sfx.start_ambient(vol=0.38)
             self.tela_minigame = TelaMiniPythonHero(
                 largura=self.largura,
                 altura=self.altura,
@@ -467,14 +468,14 @@ class GameManager:
 
 
     def processar_resultado_exercicio(self):
-        """Para fases 1..8: MG é a 5ª questão. Se já foi feito (índice >= 5), não reabrir MG."""
+        """Para fases 1..16: MG é a 5ª questão. Se já foi feito (índice >= 5), não reabrir MG."""
         fase_id = self.id_fases[self.fase_atual]
 
-        if 1 <= fase_id <= 8:
+        if 1 <= fase_id <= 16:
             total_q = len(self.tela_exercicio.exercicios) if self.tela_exercicio else 4
             idx_atual = getattr(self.tela_exercicio, "indice_atual", total_q)
 
-            # Se já registramos o MG como 'feito' (índice >= 5), vai direto para o Resultado.
+            # Se o MG já foi registrado como 'feito' (índice >= 5), mostra Resultado direto.
             if idx_atual >= total_q + 1:
                 acertou_minimo = (self.tela_exercicio.acertos >= 4)  # 4 de 5
                 self._ultimo_resultado_ok = acertou_minimo
@@ -484,7 +485,7 @@ class GameManager:
                     self.altura,
                     self.tela_exercicio.acertos,
                     self.tela_exercicio.erros,
-                    total_q + 1,  # mostra 5 no total
+                    total_q + 1,  # 5 no total (4 + MG)
                     callback_avancar=self.avancar_fase,      # MG já feito → avança direto
                     callback_reiniciar=self.reiniciar_exercicio,
                     acertou_minimo=acertou_minimo,
@@ -506,7 +507,7 @@ class GameManager:
             self.iniciar_minigame()
             return
 
-        # Intermediário (fases > 8): fluxo antigo
+        # (Opcional) Fases > 16: mantém fluxo antigo como fallback
         acertou_minimo = self.tela_exercicio.acertos >= 4
         self._ultimo_resultado_ok = acertou_minimo
 
@@ -529,51 +530,59 @@ class GameManager:
 
 
 
+
     def avancar_fase(self):
         if self.fase_atual < len(self.id_fases) - 1:
-            # Fase que está sendo concluída AGORA (sem mexer na tua lógica original)
+            # Fase que está sendo concluída AGORA
             fase_concluida = self.id_fases[self.fase_atual]
 
-            total_exercicios = len(self.exercicio_service.listar_exercicios_por_fase(fase_concluida))
+            # Alinha o "total necessário" à regra 4 + MG = 5 nas fases 1..16
+            raw_total_exs = len(self.exercicio_service.listar_exercicios_por_fase(fase_concluida))
+            total_necessario = 5 if 1 <= fase_concluida <= 16 else raw_total_exs
+
             ultima_fase_no_save = self.progresso_service.progresso_persistencia.buscar_ultima_fase_do_jogador(
                 self.jogador_atual.get_id_jogador()
             )
 
-            # ✅ Regras de bônus preservadas
-            if (fase_concluida == ultima_fase_no_save and
-                self.progresso_service.fase_ja_concluida(
-                    self.jogador_atual.get_id_jogador(),
-                    fase_concluida,
-                    total_exercicios
-                )):
+            # Compat com saves antigos (que podem ter parado no 4 antes do MG)
+            concluiu_novo = self.progresso_service.fase_ja_concluida(
+                self.jogador_atual.get_id_jogador(), fase_concluida, total_necessario
+            )
+            concluiu_compat = False
+            if 1 <= fase_concluida <= 16 and not concluiu_novo:
+                # Tolerar "4" como fase concluída se existir legado
+                concluiu_compat = self.progresso_service.fase_ja_concluida(
+                    self.jogador_atual.get_id_jogador(), fase_concluida, 4
+                )
+
+            if (fase_concluida == ultima_fase_no_save) and (concluiu_novo or concluiu_compat):
+                # >>> bônus ao encerrar o INICIANTE (fase 8)
                 if fase_concluida == 8:
                     backend_atual = self.jogador_atual.get_backend()
-                    ganho = 10 + self.bonus_backend_iniciante  # base + bônus das estrelas
+                    ganho = 10  # se quiser somar as estrelas: 10 + self.bonus_backend_iniciante
                     self.jogador_atual.set_backend(backend_atual + ganho)
                     self.jogador_service.atualizar_jogador(self.jogador_atual)
-                    # reseta o acumulador para não vazar pro próximo ciclo
                     self.bonus_backend_iniciante = 0
 
+                # >>> bônus por tópico no INTERMEDIÁRIO (9..16)
                 elif 9 <= fase_concluida <= 16:
                     backend_atual = self.jogador_atual.get_backend()
                     self.jogador_atual.set_backend(backend_atual + 5)
                     self.jogador_service.atualizar_jogador(self.jogador_atual)
 
-            # ✅ Verifica a PRÓXIMA fase no BD ANTES de avançar o índice local
+            # Verifica a PRÓXIMA fase no BD antes de avançar
             proximo_idx = self.fase_atual + 1
             proxima_fase_id = self.id_fases[proximo_idx]
-
-            # se a próxima fase não existir no BD, não avança e evita o crash do get_topico()
             if self.fase_service.buscar_fase_por_id(proxima_fase_id) is None:
                 print(f"[WARN] Próxima fase {proxima_fase_id} não cadastrada no banco. Encerrando para evitar crash.")
                 self.tela_atual = "fim"
                 return
 
-            # ✅ Agora sim: avança em memória e no BD
+            # Avança em memória e no BD
             self.fase_atual = proximo_idx
             self.jogador_service.avancar_fase_jogador(self.jogador_atual.get_id_jogador())
 
-            # ✅ Anti-revisita (mantido): cria/garante progresso 'stub' na NOVA fase
+            # Anti-revisita: cria/garante progresso 'stub' na NOVA fase
             self.progresso_service.salvar_ou_atualizar_progresso(
                 jogador=self.jogador_atual,
                 id_fase=proxima_fase_id,
@@ -583,10 +592,11 @@ class GameManager:
                 resposta_parcial=""
             )
 
-            # Vai pra introdução da nova fase (agora garantido existir)
+            # Vai pra introdução da nova fase
             self.mostrar_introducao()
         else:
             self.tela_atual = "fim"
+
 
 
 
@@ -816,7 +826,11 @@ class GameManager:
             #print(self.tela_atual)
             #aqui a tela é indrução por enquanto
             # --- BOTÃO LOJA GLOBAL (aparece em qualquer tela, se jogador for Intermediário) ---
-            if self.jogador_atual and 9 <= self.jogador_atual.get_id_fase() <= 16 and self.tela_atual == "introducao":
+            if (
+                self.jogador_atual
+                and 9 <= self.jogador_atual.get_id_fase() <= 16
+                and self.tela_atual in ("introducao", "exercicio", "resultado")
+            ):
                 botao_loja = pygame.Rect(self.largura - 220, 40, 180, 50)
                 pygame.draw.rect(self.tela, (70, 120, 200), botao_loja, border_radius=8)
                 fonte = pygame.font.SysFont('Arial', 28, bold=True)

@@ -39,7 +39,10 @@ class ExercicioServiceImpl(ExercicioService):
     
 
     def validar_codigo_ast_por_topico(self, codigo, id_fase):
+        import ast
+
         FASE_TO_TOPICO = {
+            # INICIANTE
             1: "Saída de Dados com print()",
             2: "Entrada de Dados com input()",
             3: "Variáveis e Tipos Simples",
@@ -48,7 +51,17 @@ class ExercicioServiceImpl(ExercicioService):
             6: "Estruturas de Repetição (for)",
             7: "Estrutura de Repetição (while)",
             8: "Funções Simples",
+            # INTERMEDIÁRIO
+            9:  "f-strings e formatação",
+            10: "Métodos de string",
+            11: "Listas (métodos e slicing)",
+            12: "Tuplas e imutabilidade",
+            13: "Conjuntos (set)",
+            14: "Dicionários",
+            15: "List Comprehensions",
+            16: "Tratamento de Erros",
         }
+
         topico = FASE_TO_TOPICO.get(id_fase, None)
         if not topico:
             return True, ""  # Não exige regra extra para tópicos não mapeados
@@ -59,66 +72,163 @@ class ExercicioServiceImpl(ExercicioService):
         except Exception as e:
             return False, f"Código inválido: {e}"
 
-        # Fase 1 - print()
+        # --------- Helpers rápidos ---------
+        def tem_call_nome(nome):
+            return any(isinstance(n, ast.Call) and getattr(n.func, "id", "") == nome for n in ast.walk(arvore))
+
+        def tem_call_metodo(metodos):
+            for n in ast.walk(arvore):
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
+                    if n.func.attr in metodos:
+                        return True
+            return False
+
+        def tem_no(tipo):
+            return any(isinstance(n, tipo) for n in ast.walk(arvore))
+
+        # =========================
+        # INICIANTE (1..8)
+        # =========================
+
         if topico == "Saída de Dados com print()":
-            tem_print = any(isinstance(n, ast.Call) and getattr(n.func, "id", "") == "print" for n in ast.walk(arvore))
-            if not tem_print:
+            if not tem_call_nome("print"):
                 return False, "Seu código deve usar print() para exibir informações na tela."
             return True, ""
 
-        # Fase 2 - input()
         elif topico == "Entrada de Dados com input()":
-            tem_input = any(isinstance(n, ast.Call) and getattr(n.func, "id", "") == "input" for n in ast.walk(arvore))
-            tem_print = any(isinstance(n, ast.Call) and getattr(n.func, "id", "") == "print" for n in ast.walk(arvore))
+            tem_input = tem_call_nome("input")
+            tem_print = tem_call_nome("print")
             if not tem_input:
                 return False, "Você deve usar input() para ler o valor do usuário."
             if not tem_print:
                 return False, "Você deve mostrar o valor lido usando print()."
             return True, ""
 
-        # Fase 3 - variáveis
         elif topico == "Variáveis e Tipos Simples":
-            tem_atribuicao = any(isinstance(n, ast.Assign) for n in ast.walk(arvore))
-            tem_print = any(isinstance(n, ast.Call) and getattr(n.func, "id", "") == "print" for n in ast.walk(arvore))
+            tem_atribuicao = tem_no(ast.Assign)
+            tem_print = tem_call_nome("print")
             if not tem_atribuicao:
                 return False, "Seu código deve criar pelo menos uma variável (usar =)."
             if not tem_print:
                 return False, "Seu código deve exibir o valor de uma variável usando print()."
             return True, ""
 
-        # Fase 4 - operadores
         elif topico == "Operadores Aritméticos e Relacionais":
-            tem_operador = any(isinstance(n, (ast.BinOp, ast.Compare)) for n in ast.walk(arvore))
-            if not tem_operador:
+            if not any(isinstance(n, (ast.BinOp, ast.Compare)) for n in ast.walk(arvore)):
                 return False, "Use algum operador aritmético ou relacional (+, -, *, /, ==, !=, etc)."
             return True, ""
 
-        # Fase 5 - if/else
         elif topico == "Estruturas Condicionais (if/else)":
-            tem_if = any(isinstance(n, ast.If) for n in ast.walk(arvore))
-            if not tem_if:
+            if not tem_no(ast.If):
                 return False, "Você deve usar um if em seu código."
             return True, ""
 
-        # Fase 6 - for
         elif topico == "Estruturas de Repetição (for)":
-            tem_for = any(isinstance(n, ast.For) for n in ast.walk(arvore))
-            if not tem_for:
+            if not tem_no(ast.For):
                 return False, "Você deve usar um laço for em seu código."
             return True, ""
 
-        # Fase 7 - while
         elif topico == "Estrutura de Repetição (while)":
-            tem_while = any(isinstance(n, ast.While) for n in ast.walk(arvore))
-            if not tem_while:
+            if not tem_no(ast.While):
                 return False, "Você deve usar um laço while em seu código."
             return True, ""
 
-        # Fase 8 - funções
         elif topico == "Funções Simples":
-            tem_funcao = any(isinstance(n, ast.FunctionDef) for n in ast.walk(arvore))
-            if not tem_funcao:
+            if not tem_no(ast.FunctionDef):
                 return False, "Você deve definir uma função usando def."
+            return True, ""
+
+        # =========================
+        # INTERMEDIÁRIO (9..16)
+        # =========================
+
+        elif topico == "f-strings e formatação":
+            # Exige pelo menos UMA f-string (ast.JoinedStr). Opcional: aceitar FormatSpec.
+            usa_fstring = any(isinstance(n, ast.JoinedStr) for n in ast.walk(arvore))
+            if not usa_fstring:
+                return False, "Use ao menos uma f-string (ex.: f\"Olá, {nome}\")."
+            return True, ""
+
+        elif topico == "Métodos de string":
+            # Procura chamadas a métodos típicos de str
+            METODOS = {
+                "strip", "lstrip", "rstrip",
+                "upper", "lower", "casefold", "title",
+                "startswith", "endswith",
+                "split", "join", "replace",
+                "find", "index", "count",
+                "isalpha", "isdigit", "isalnum", "isnumeric",
+            }
+            if not tem_call_metodo(METODOS):
+                return False, "Use pelo menos um método de string (ex.: .upper(), .split(','), .replace('a','b'))."
+            return True, ""
+
+        elif topico == "Listas (métodos e slicing)":
+            # Aceita: lista literal, métodos de lista, slicing (Subscript com Slice) ou sorted()
+            METODOS_LISTA = {"append", "extend", "insert", "remove", "clear", "sort", "reverse"}
+            tem_lista_literal = tem_no(ast.List)
+            tem_metodo_lista = tem_call_metodo(METODOS_LISTA)
+            tem_sorted = tem_call_nome("sorted")
+
+            tem_slicing = False
+            for n in ast.walk(arvore):
+                if isinstance(n, ast.Subscript) and isinstance(n.slice, ast.Slice):
+                    tem_slicing = True
+                    break
+
+            if not (tem_lista_literal or tem_metodo_lista or tem_slicing or tem_sorted):
+                return False, "Use listas com métodos (append/extend/...) ou slicing (ex.: l[1:4]) ou sorted(l)."
+            return True, ""
+
+        elif topico == "Tuplas e imutabilidade":
+            # Aceita: tupla literal, desempacotamento, tuple(...)
+            tem_tupla = any(isinstance(n, ast.Tuple) for n in ast.walk(arvore))
+            tem_tuple_ctor = tem_call_nome("tuple")
+            if not (tem_tupla or tem_tuple_ctor):
+                return False, "Use uma tupla (ex.: t = (1,2) ou a,b = (1,2) ou tuple(lista))."
+            return True, ""
+
+        elif topico == "Conjuntos (set)":
+            # Aceita: set literal {1,2}, set(), ou métodos típicos de set
+            METODOS_SET = {
+                "add", "discard", "remove", "pop",
+                "update", "union", "intersection",
+                "difference", "symmetric_difference",
+            }
+            tem_set_literal = any(isinstance(n, ast.Set) for n in ast.walk(arvore))
+            tem_set_ctor = tem_call_nome("set")
+            tem_metodo_set = tem_call_metodo(METODOS_SET)
+            if not (tem_set_literal or tem_set_ctor or tem_metodo_set):
+                return False, "Use um set (ex.: {1,2} ou set([1,2])) ou métodos como .add(), .union(), .intersection()."
+            return True, ""
+
+        elif topico == "Dicionários":
+            # Aceita: dict literal, dict comprehension, dict(), ou métodos típicos
+            METODOS_DICT = {"get", "keys", "values", "items", "setdefault", "pop", "clear", "update"}
+            tem_dict_literal = tem_no(ast.Dict)
+            tem_dict_comp = tem_no(ast.DictComp)
+            tem_dict_ctor = tem_call_nome("dict")
+            tem_metodo_dict = tem_call_metodo(METODOS_DICT)
+            if not (tem_dict_literal or tem_dict_comp or tem_dict_ctor or tem_metodo_dict):
+                return False, "Use um dicionário (ex.: {'k':1}, {k:v for ...}, dict(...)) ou métodos como .get(), .items()."
+            return True, ""
+
+        elif topico == "List Comprehensions":
+            # Requer especificamente uma list comprehension
+            tem_list_comp = tem_no(ast.ListComp)
+            if not tem_list_comp:
+                return False, "Use uma list comprehension (ex.: [i*i for i in range(5)])."
+            return True, ""
+
+        elif topico == "Tratamento de Erros":
+            # Requer try/except (ou finally). Pode ter raise opcionalmente.
+            tem_try = False
+            for n in ast.walk(arvore):
+                if isinstance(n, ast.Try) and (n.handlers or n.finalbody):
+                    tem_try = True
+                    break
+            if not tem_try:
+                return False, "Use try/except (ou try/finally) para tratar erros."
             return True, ""
 
         # Qualquer outro caso

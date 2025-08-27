@@ -188,32 +188,165 @@ def _content_funcoes():
     ]
     return _ok(seq, dist)
 
+# ===================== NOVOS TÓPICOS (Fases 9–16) =====================
+
+def _content_fstrings_formatacao():
+    nome = random.choice(["Ana", "Joao", "Py"])
+    seq = [
+        f"nome = '{nome}'",
+        "x = 3.14159",
+        "print(f'Olá, {nome} {x:.2f}')",
+    ]
+    dist = [
+        _d("print(f'Olá, {nome')", "Chave não fechada em f-string."),
+        _d("print('{nome}')", "Sem o prefixo f: vira literal."),
+        _d("print(f'{x:2f}')", "Especificador inválido (use :.2f)."),
+        _d("print('Olá, {}'.format())", "format() sem argumento."),
+        _d("print('{:d}'.format('3'))", "Tipo errado para {:d}."),
+        _d("formt('x={}'.format(1))", "format() escrito errado."),
+    ]
+    return _ok(seq, dist)
+
+def _content_metodos_string():
+    seq = [
+        "s = '  Python  '",
+        "s = s.strip()",
+        "print(s.upper())",
+    ]
+    dist = [
+        _d("s = 123; s.lower()", "Método de string em int."),
+        _d("print('py'.upper)", "Faltou chamar: upper()."),
+        _d("['a','b'].join('-')", "join é de string: '-'.join(lista)."),
+        _d("'-'.join('a','b')", "join recebe 1 iterável, não 2 args."),
+        _d("print('abc'.repl('b','x'))", "Método inexistente: replace()."),
+    ]
+    return _ok(seq, dist)
+
+def _content_listas():
+    a, b = _pick2(_NUMS)
+    seq = [
+        f"l = [{a}, {b}, 3]",
+        "l.append(4)",
+        "print(l[1:])",
+    ]
+    dist = [
+        _d("l = {}; l.append(1)", "{} cria dict, não lista."),
+        _d("l.add(2)", "Lista não tem add()."),
+        _d("print(l[1:5:0])", "step=0 é inválido."),
+        _d("print(l[10])", "Provável IndexError."),
+        _d("extend(l, [1])", "extend é método: l.extend([1])."),
+    ]
+    return _ok(seq, dist)
+
+def _content_tuplas():
+    seq = [
+        "t = (1, 2)",
+        "a, b = t",
+        "print(a)",
+    ]
+    dist = [
+        _d("t = (1)", "(1) é int; para tupla use (1,)."),
+        _d("t[0] = 9", "Tuplas são imutáveis."),
+        _d("t.append(3)", "Tupla não tem append()."),
+        _d("a, b = (1,2,3)", "Tamanhos diferentes no desempacote."),
+    ]
+    return _ok(seq, dist)
+
+def _content_sets():
+    seq = [
+        "s = {1, 2}",
+        "s.add(3)",
+        "print(2 in s)",
+    ]
+    dist = [
+        _d("s = {}; s.add(1)", "{} é dict; use set()."),
+        _d("s = set(); s.append(1)", "Set não tem append()."),
+        _d("s = {1,2}; s.remove(3)", "remove erra se não existir (use discard)."),
+        _d("s = {{1}}", "set dentro de set é inhashável."),
+        _d("s = {[1,2]}", "Lista é inhashável como chave de set."),
+        _d("{1,2} + {3}", "Use união com |, não +."),
+    ]
+    return _ok(seq, dist)
+
+def _content_dicts():
+    seq = [
+        "d = {'n': 1}",
+        "d['n'] = 2",
+        "print(d.get('x', 0))",
+    ]
+    dist = [
+        _d("print(d.x)", "Acesso por atributo não lê chave."),
+        _d("d = [('a',1)]; d['a']", "Lista não indexa por chave string."),
+        _d("print({'a':1}['b'])", "KeyError provável."),
+        _d("d = {['a']:1}", "Lista é inhashável como chave."),
+        _d("{1:'a',1:'b'}", "Chave duplicada sobrescreve anterior."),
+    ]
+    return _ok(seq, dist)
+
+def _content_list_comprehensions():
+    seq = [
+        "nums = [1, 2, 3]",
+        "quad = [n*n for n in nums]",
+        "print(quad)",
+    ]
+    dist = [
+        _d("[n for n in range(3) if]", "if sem condição é inválido."),
+        _d("[x for in range(3)]", "Faltou variável antes de in."),
+        _d("[x for x range(3)]", "Faltou 'in'."),
+        _d("{x for x in [1,1,2]}", "Isto cria set, não lista."),
+        _d("(x for x in [1,2])", "Isto é generator, não lista."),
+        _d("[n* for n in range(3)]", "Expressão incompleta antes do for."),
+    ]
+    return _ok(seq, dist)
+
+def _content_tratamento_erros():
+    seq = [
+        "try:",
+        "x = 1/0",
+        "except ZeroDivisionError:",
+        "print('erro')",
+        "finally:",
+        "print('fim')",
+    ]
+    dist = [
+        _d("try: pass; catch Exception: pass", "Não existe catch em Python."),
+        _d("try: x=1; except e: print(e)", "Use 'except Tipo as e'."),
+        _d("try: pass; finally print('x')", "Falta ':' após finally."),
+        _d("raise NotAnError('x')", "Classe de exceção não definida."),
+        _d("except ValueError, e:", "Sintaxe do Python 2; use 'as e'."),
+    ]
+    return _ok(seq, dist)
+
 # ------------------------------------------------------------
 # ROTEADOR POR TÍTULO (INICIANTE)
 # ------------------------------------------------------------
 def get_cobra_content(topic_title: str):
-    """
-    Retorna (sequencia, distratores_com_why)
-      - sequencia: [str, ...]
-      - distratores_com_why: [{"txt": str, "why": str}, ...]
-    """
-    t = _norm(topic_title)
+    t = _norm(topic_title)  # minúsculo + sem acento
 
-    if "saida de dados" in t or "print" in t:
-        return _content_print()
-    if "entrada de dados" in t or "input" in t:
-        return _content_input()
-    if "variaveis" in t or "variavel" in t or "tipos simples" in t:
-        return _content_variaveis()
-    if "operadores" in t or "relacionais" in t or "aritmeticos" in t:
-        return _content_operadores()
-    if "condicionais" in t or "if/else" in t or "if else" in t or " if " in t or t.startswith("if"):
-        return _content_if()
-    if "repeticao (for)" in t or " for)" in t or " for " in t:
-        return _content_for()
-    if "repeticao (while)" in t or " while)" in t or " while " in t:
-        return _content_while()
-    if "funcoes" in t or "funções" in t or "funcao" in t or "função" in t:
-        return _content_funcoes()
+    ROUTER = {
+        # ----- EXISTENTES -----
+        "saida de dados com print()": _content_print,
+        "entrada de dados com input()": _content_input,
+        "variaveis e tipos simples": _content_variaveis,
+        "operadores aritmeticos e relacionais": _content_operadores,
+        "estruturas condicionais (if/else)": _content_if,
+        "estruturas de repeticao (for)": _content_for,
+        "estrutura de repeticao (while)": _content_while,
+        "funcoes simples": _content_funcoes,
 
-    return _content_print()
+        # ----- Fases 9–16 -----
+        "f-strings e formatacao": _content_fstrings_formatacao,
+        "metodos de string": _content_metodos_string,
+        "listas (metodos e slicing)": _content_listas,
+        "tuplas e imutabilidade": _content_tuplas,
+        "conjuntos (set)": _content_sets,
+        "dicionarios": _content_dicts,
+        "list comprehensions": _content_list_comprehensions,
+        "tratamento de erros": _content_tratamento_erros,
+    }
+
+    fn = ROUTER.get(t)
+    if fn:
+        return fn()
+    return _content_print()  # fallback
+

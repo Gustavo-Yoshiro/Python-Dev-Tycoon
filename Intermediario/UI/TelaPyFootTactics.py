@@ -34,7 +34,7 @@ class TelaPyFootTactics:
         rounds: int = 14,
         round_seconds: int | None = None,
         match_seconds: int | None = None,
-        sfx=None,                              # <<< recebe SFX aqui
+        sfx=None,
     ):
         self.largura = largura
         self.altura = altura
@@ -135,9 +135,11 @@ class TelaPyFootTactics:
         self.goal_rings = []      # [{"start", "dur", "x", "y"}]
 
         # --- Torcida ambiente (baixa) ---
+        
         if self.sfx:
-            self.sfx.start_ambient(vol=0.14)
+            self.sfx.start_ambient(vol=0.45)
             self._ambient_started = True
+            
 
     # ---------------------------------------------------------
     # utils de campo
@@ -224,14 +226,46 @@ class TelaPyFootTactics:
     # ---------------------------------------------------------
     # mini-conteúdo p/ DUEL (2 opções)
     def _make_duel(self):
-        qlist = get_pyfoot_questions(self.topic_title, rounds=1)
-        if not qlist:
-            return {"opts": ["OK", "ERRO"], "correct": 0}
-        q = qlist[0]
-        correct_idx = q["correct"]
-        wrong_idx = (correct_idx + 1) % 3
-        return {"opts": [q["opts"][correct_idx], q["opts"][wrong_idx]],
-                "correct": 0}
+            """
+            Monta um mini-duelo com 2 opções.
+            - A alternativa correta é posicionada aleatoriamente à esquerda(0) ou direita(1).
+            - O 'why' de cada lado é preenchido para logs/feedback coerentes.
+            """
+            qlist = get_pyfoot_questions(self.topic_title, rounds=1)
+            if not qlist:
+                # fallback simples e simétrico
+                side_correct = random.randint(0, 1)
+                opts2 = ["OK", "ERRO"]
+                if side_correct == 1:
+                    opts2 = ["ERRO", "OK"]
+                return {"opts": opts2, "correct": side_correct, "why": ["", ""]}
+
+            q = qlist[0]
+            correct_idx = int(q.get("correct", 0))
+
+            # pega um errado entre os dois possíveis (não fixa no +1)
+            all_idx = [0, 1, 2]
+            wrong_candidates = [i for i in all_idx if i != correct_idx]
+            wrong_idx = random.choice(wrong_candidates)
+
+            # decide o lado (0=esq, 1=dir) da alternativa correta
+            side_correct = random.randint(0, 1)
+
+            # monta pares (texto/why) já ordenados para esquerda/direita
+            q_opts = q.get("opts", ["", "", ""])
+            q_why  = q.get("why",  ["", "", ""])
+
+            left_text  = q_opts[correct_idx] if side_correct == 0 else q_opts[wrong_idx]
+            right_text = q_opts[wrong_idx]   if side_correct == 0 else q_opts[correct_idx]
+
+            left_why   = q_why[correct_idx]  if side_correct == 0 else (q_why[wrong_idx] if len(q_why) > wrong_idx else "")
+            right_why  = (q_why[wrong_idx] if len(q_why) > wrong_idx else "") if side_correct == 0 else q_why[correct_idx]
+
+            return {
+                "opts": [left_text, right_text],
+                "correct": side_correct,           # 0 = esquerda, 1 = direita
+                "why": [left_why, right_why],
+            }
 
     # ---------------------------------------------------------
     # perguntas / opções
@@ -350,6 +384,7 @@ class TelaPyFootTactics:
         show_options = (self.phase == "pass" and self.ball_anim is None)
 
         self.opt_bubbles = []
+        placed_opt_bubbles = []
         for i, (cx, cy) in enumerate(self.receivers):
             # receptores
             pygame.draw.circle(tela, (240, 220, 120), (cx, cy), 12)
@@ -369,12 +404,27 @@ class TelaPyFootTactics:
                 lines = lines[:3] + (["..."] if len(lines) > 3 else [])
                 bb_w = max(self.fonte_s.size(l)[0] for l in lines) + 16
                 bb_h = len(lines)*(self.fonte_s.get_height()+2) + 12
+
                 bx = cx - bb_w//2
                 by = cy - 72 - bb_h
-                bx = max(self.field_rect.x+8, min(bx, self.field_rect.right-8-bb_w))
+
+                # FIX 1: clamp vertical INCONDICIONAL (evita a bolha sumir pra cima)
                 by = max(self.field_rect.y+8, by)
 
+                # clamp horizontal
+                bx = max(self.field_rect.x+8, min(bx, self.field_rect.right-8-bb_w))
+
                 bubble = pygame.Rect(bx, by, bb_w, bb_h)
+
+                # anticolisão leve: empilha pra cima se colidir com alguma já colocada
+                tries = 0
+                while any(bubble.colliderect(pr) for pr in placed_opt_bubbles) and tries < 6:
+                    bubble.y -= 12
+                    # FIX 2: manter top sempre no campo mesmo ao empilhar
+                    bubble.y = max(self.field_rect.y+8, bubble.y)
+                    tries += 1
+
+                # desenha
                 pygame.draw.rect(tela, (36, 52, 92), bubble, border_radius=8)
                 pygame.draw.rect(tela, (120, 180, 255), bubble, 1, border_radius=8)
 
@@ -385,6 +435,7 @@ class TelaPyFootTactics:
                     yy += self.fonte_s.get_height()+2
 
                 self.opt_bubbles.append(bubble)
+                placed_opt_bubbles.append(bubble)
 
         # DUEL UI (se ativo)
         if self.phase == "duel" and self.duel and self.ball_anim is None:
@@ -403,14 +454,33 @@ class TelaPyFootTactics:
             # duas bolhas de opção
             self.duel["rects"] = []
             opts2 = self.duel["opts"]
+            placed_duel = []
+
             for j in range(2):
                 text = opts2[j]
                 lines = self._wrap_text(text, self.fonte_s, 180)
                 bb_w = max(self.fonte_s.size(l)[0] for l in lines) + 16
                 bb_h = len(lines)*(self.fonte_s.get_height()+2) + 12
+
+                # left (0) fica à esquerda do rx; right (1) à direita
                 bx = rx - (bb_w + 12) if j == 0 else rx + 12
                 by = ry - 52 - bb_h
+
+                # FIX 3: clamp vertical INCONDICIONAL também no DUEL
+                by = max(self.field_rect.y+8, by)
+
+                # clamp horizontal dentro do campo
+                bx = max(self.field_rect.x+8, min(bx, self.field_rect.right-8-bb_w))
                 bubble = pygame.Rect(bx, by, bb_w, bb_h)
+
+                # anticolisão simples entre as duas bolhas do DUEL
+                tries = 0
+                while any(bubble.colliderect(pr) for pr in placed_duel) and tries < 4:
+                    bubble.y -= 12
+                    bubble.y = max(self.field_rect.y+8, bubble.y)
+                    tries += 1
+
+                # desenha
                 pygame.draw.rect(tela, (44, 60, 96), bubble, border_radius=8)
                 pygame.draw.rect(tela, (120, 180, 255), bubble, 1, border_radius=8)
                 yy = bubble.y + 6
@@ -418,7 +488,9 @@ class TelaPyFootTactics:
                     img = self.fonte_s.render(ln, True, (235, 235, 245))
                     tela.blit(img, (bubble.x+8, yy))
                     yy += self.fonte_s.get_height()+2
+
                 self.duel["rects"].append(bubble)
+                placed_duel.append(bubble)
 
             # animação do carrinho (zagueiro deslizando até o receptor)
             if self.tackle:
@@ -658,7 +730,7 @@ class TelaPyFootTactics:
                     self._set_ball_to_10()
 
             elif end_type == "shot_end":
-                # 🔔 Dispara os efeitos APÓS a bola "chegar"
+                # disparar FX após a bola chegar
                 if getattr(self, "_shot_fx", None):
                     fx = self._shot_fx
                     self._shot_fx = None
@@ -696,7 +768,7 @@ class TelaPyFootTactics:
         # tempo de DUEL expirado?
         if self.phase == "duel" and self.duel and self.ball_anim is None:
             if time.time() > self.duel["deadline"]:
-                if self.sfx: self.sfx.tackle()  # SFX: carrinho (timeout)
+                if self.sfx: self.sfx.tackle()
                 self._register_miss("Duelo", "Perdeu a bola no carrinho (tempo esgotado).")
                 self.duel = None
                 self.tackle = None
@@ -708,9 +780,11 @@ class TelaPyFootTactics:
         self._draw_sidebar(tela)
 
         # parar torcida quando finalizar (uma vez)
+        
         if self.finished and self._ambient_started and self.sfx:
             self.sfx.stop_ambient()
             self._ambient_started = False
+        
 
         if self.finished:
             self._draw_finish_overlay(tela)
@@ -752,7 +826,7 @@ class TelaPyFootTactics:
                     self.scroll_ok = max(0.0, min(self.scroll_ok - (delta/1), float(max_scroll_ok)))
                 if self._area_bug.collidepoint(mx, my):
                     content_h_bug = max(0, len(self.hits_bug_list)*line_h)
-                    max_scroll_bug = max(0, len(self.hits_bug_list)*line_h - self._area_bug.h)
+                    max_scroll_bug = max(0, content_h_bug - self._area_bug.h)  # FIX: usa content_h_bug
                     self.scroll_bug = max(0.0, min(self.scroll_bug - (delta/1), float(max_scroll_bug)))
 
             # clique primário
@@ -786,13 +860,13 @@ class TelaPyFootTactics:
                     for j, rect in enumerate(self.duel["rects"]):
                         if rect.collidepoint(mx, my):
                             if j == self.duel["correct"]:
-                                if self.sfx: self.sfx.dribble()  # venceu duelo
+                                if self.sfx: self.sfx.dribble()
                                 self._add_message("Drible!", (180,255,180), (self.duel["rx"], self.duel["ry"]-80), 0.9)
                                 self.duel = None
                                 self.tackle = None
                                 self.phase = "shot"
                             else:
-                                if self.sfx: self.sfx.tackle()   # perdeu duelo
+                                if self.sfx: self.sfx.tackle()
                                 chosen_text = ""
                                 try:
                                     chosen_text = self.duel.get("opts", [])[j]
@@ -884,7 +958,7 @@ class TelaPyFootTactics:
     # ---------------------------------------------------------
     # ações de jogo
     def _do_pass(self, target_xy, is_correct, q, chosen_idx, lane=1):
-        if self.sfx: self.sfx.pass_kick()  # toque de bola no passe
+        if self.sfx: self.sfx.pass_kick()
         a = (self.ball_pos[0], self.ball_pos[1])
         b = (target_xy[0], target_xy[1] - 10)
         self._pass_was_correct = bool(is_correct)
@@ -896,7 +970,7 @@ class TelaPyFootTactics:
             self.phase = "duel"
             self.duel = self._make_duel()
             self.duel["rx"], self.duel["ry"] = int(target_xy[0]), int(target_xy[1])
-            self.duel["total"] = 3.0
+            self.duel["total"] = 4.0
             self.duel["deadline"] = time.time() + self.duel["total"]
             self.duel["rects"] = []
             self.tackle = {"lane": lane, "start": time.time(), "dur": 1.8}
@@ -913,7 +987,7 @@ class TelaPyFootTactics:
 
         flight = 0.50
 
-        if self.sfx: self.sfx.shot()  # som do chute
+        if self.sfx: self.sfx.shot()
 
         # goleiro segue a direção do chute
         self.gk_dir = 1 if (x2 > self.gk_x) else -1

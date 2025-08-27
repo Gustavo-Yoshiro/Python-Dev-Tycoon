@@ -7,11 +7,12 @@ from Intermediario.Content.BugSquashContent import get_bug_squash_content
 # ============================================================
 # Whack-a-Python (Intermediário) — por rodadas
 #   • Rodadas de 5s (configuráveis): várias cobras simultâneas.
-#   • Alvo alterna por rodada: BUG ↔ CORRETO (badge colorido).
+#   • Alvo alterna por rodada: BUG ↔ CORRETO.
 #   • Temporizador circular por rodada (topo, centro).
 #   • Histórico lateral com hover + SCROLL (durante e após o jogo).
 #   • Feedback de clique: marreta animada + anel de impacto + pop de pontos.
-#   • Balões de código com ANTICOLISÃO (posicionamento inteligente + leader line).
+#   • Texto do código desenhado diretamente no campo (sem balão/linha).
+#   • Seleção de buracos evita vizinhança (sem cobras coladas) e máx. 5.
 #   • Fim: congela campo, botão CONTINUAR; então on_finish({...}).
 # ============================================================
 
@@ -27,15 +28,13 @@ class TelaBugSquashArcade:
         lanes: int = 7,
         sfx=None,
     ):
-        self.sfx = sfx 
+        self.sfx = sfx
         self.largura = largura
         self.altura = altura
         self.topic_title = topic_title or "print"
         self.on_finish = on_finish
         self.pass_score = int(pass_score)
         self.total_seconds = max(10, int(round_seconds))
-
-        
 
         # ===== fonts
         pygame.font.init()
@@ -90,6 +89,10 @@ class TelaBugSquashArcade:
         self.holes = []      # lista de rects
         self._build_holes()
 
+        # ===== limites por rodada
+        self.min_snakes = 5
+        self.max_snakes = 6   # <= mantém 6 como você deixou
+
         # ===== por rodada
         self.round_len = 5.0                   # 5 segundos por rodada (ajustável)
         self.num_rounds = max(1, int(self.total_seconds // self.round_len))
@@ -99,23 +102,31 @@ class TelaBugSquashArcade:
         self.round_end_ts = self.round_start_ts + self.round_len
 
         # cobras ativas nesta rodada:
-        # dict {hole_idx, code, is_bug, why, hit}
+        # dict {hole_idx, code, is_bug, why, hit, label_rect}
         self.spawns = []
         self._compose_round()                  # gera a 1ª rodada
 
         # ===== histórico lateral + SCROLL
-        # cada item: {"code":str, "why":str, "is_bug":bool}
+        # cada item: {"code":str, "why":str, "is_bug":bool|None}
         self.hits_ok_list  = []
         self.hits_bug_list = []
+        self.errors_list   = []                # <-- NOVO: erros (alvo errado ou clique vazio)
+
         # rects visíveis (para hover)
-        self._hist_rects_ok = []
+        self._hist_rects_ok  = []
         self._hist_rects_bug = []
-        self._hover_tooltip = ""               # texto atual do tooltip (porquê)
+        self._hist_rects_err = []             # <-- NOVO
+
+        # tooltip
+        self._hover_tooltip = ""
+
         # scroll state
         self.scroll_ok = 0.0
         self.scroll_bug = 0.0
-        self._area_ok = pygame.Rect(0,0,0,0)   # preenchido no draw
+        self.scroll_err = 0.0                  # <-- NOVO
+        self._area_ok  = pygame.Rect(0,0,0,0)  # preenchido no draw
         self._area_bug = pygame.Rect(0,0,0,0)
+        self._area_err = pygame.Rect(0,0,0,0)  # <-- NOVO
 
         # ===== efeitos de clique
         # cada efeito: {"x","y","start","dur_mallet","dur_ring","dur_pop","success", "pop"}
@@ -128,7 +139,7 @@ class TelaBugSquashArcade:
         if callable(fn):
             try: fn(*a, **kw)
             except Exception: pass
-    
+
     # ---------------------------------------------------------
     # utils
     def _wrap_text(self, text: str, font: pygame.font.Font, max_w: int):
@@ -148,47 +159,73 @@ class TelaBugSquashArcade:
             lines.append(cur)
         return lines
 
-    # ====== ANTICOLISÃO DE BALÕES ======
+    # ====== helpers de grade / vizinhança ======
+    def _hole_rc(self, idx: int):
+        return (idx // self.grid_cols, idx % self.grid_cols)
+
+    def _near(self, i: int, j: int):
+        """Considera 'perto' se distância de Chebyshev <= 1 (lado/diagonal/mesma célula)."""
+        ri, ci = self._hole_rc(i)
+        rj, cj = self._hole_rc(j)
+        return max(abs(ri - rj), abs(ci - cj)) <= 1
+
+    def _choose_non_adjacent_holes(self, k: int):
+        """Escolhe até k buracos não-vizinhos (sem lado/diagonal)."""
+        all_idx = list(range(len(self.holes)))
+        random.shuffle(all_idx)
+        chosen = []
+        for h in all_idx:
+            if all(not self._near(h, c) for c in chosen):
+                chosen.append(h)
+                if len(chosen) >= k:
+                    break
+        # se por acaso não atingir k (improvável nessa grade), fica com o máximo possível
+        return chosen
+
+    # ====== ANTICOLISÃO de etiquetas (texto) ======
     def _clamp_to_field(self, x, y, w, h):
         x = max(self.field_rect.x + 6, min(x, self.field_rect.right - 6 - w))
         y = max(self.field_rect.y + 6, min(y, self.field_rect.bottom - 6 - h))
         return x, y
 
-    def _bubble_candidates(self, hole_rect: pygame.Rect, bb_w: int, bb_h: int):
+    def _label_candidates(self, hole_rect: pygame.Rect, bb_w: int, bb_h: int):
         """
-        Gera posições candidatas para o balão deste hole.
-        Retorna lista de tuplas (x, y, ((ax,ay),(bx,by))) onde o último par
-        é a 'leader line' ligando o hole ao balão.
+        Gera posições candidatas (x,y) p/ o bloco de texto, sem linha de ligação.
+        Preferência: logo acima do buraco, com leves variações para evitar colisão.
         """
         cx = hole_rect.centerx
-        anchor = (cx, hole_rect.y - 6)  # ponto de origem da leader line
-
         cand = []
-        # A) acima-centro
+
+        # A) acima-centro (bem perto do buraco)
+        x = cx - bb_w // 2; y = hole_rect.y - bb_h - 6
+        x, y = self._clamp_to_field(x, y, bb_w, bb_h)
+        cand.append((x, y))
+
+        # B) acima-centro levemente para a esquerda
+        x = cx - bb_w // 2 - 22; y = hole_rect.y - bb_h - 8
+        x, y = self._clamp_to_field(x, y, bb_w, bb_h)
+        cand.append((x, y))
+
+        # C) acima-centro levemente para a direita
+        x = cx - bb_w // 2 + 22; y = hole_rect.y - bb_h - 8
+        x, y = self._clamp_to_field(x, y, bb_w, bb_h)
+        cand.append((x, y))
+
+        # D) acima mais alto (fallback)
         x = cx - bb_w // 2; y = hole_rect.y - bb_h - 28
         x, y = self._clamp_to_field(x, y, bb_w, bb_h)
-        cand.append((x, y, (anchor, (x + bb_w // 2, y + bb_h))))
-        # B) acima-esq
-        x = hole_rect.x - bb_w - 12; y = hole_rect.y - bb_h + 4
-        x, y = self._clamp_to_field(x, y, bb_w, bb_h)
-        cand.append((x, y, (anchor, (x + bb_w, y + bb_h // 2))))
-        # C) acima-dir
-        x = hole_rect.right + 12; y = hole_rect.y - bb_h + 4
-        x, y = self._clamp_to_field(x, y, bb_w, bb_h)
-        cand.append((x, y, (anchor, (x, y + bb_h // 2))))
-        # D) acima-centro deslocado
-        x = cx - bb_w // 2 - 30; y = hole_rect.y - bb_h - 12
-        x, y = self._clamp_to_field(x, y, bb_w, bb_h)
-        cand.append((x, y, (anchor, (x + bb_w // 2, y + bb_h))))
-        # E) fallback: abaixo-centro
+        cand.append((x, y))
+
+        # E) abaixo-centro (último recurso)
         x = cx - bb_w // 2; y = hole_rect.bottom + 6
         x, y = self._clamp_to_field(x, y, bb_w, bb_h)
-        cand.append((x, y, (anchor, (x + bb_w // 2, y))))
+        cand.append((x, y))
+
         return cand
 
-    def _place_non_overlapping(self, candidates, placed_rects, bb_w, bb_h, pad=6):
-        """Escolhe a 1ª posição candidata que não colide com balões já colocados."""
-        for x, y, leader in candidates:
+    def _place_non_overlapping_label(self, candidates, placed_rects, bb_w, bb_h, pad=6):
+        """Devolve a 1ª posição candidata que não colide com as já colocadas."""
+        for x, y in candidates:
             r = pygame.Rect(x, y, bb_w, bb_h)
             ok = True
             for pr in placed_rects:
@@ -196,10 +233,10 @@ class TelaBugSquashArcade:
                     ok = False
                     break
             if ok:
-                return r, leader
+                return r
         # se todas colidem, usa a 1ª mesmo
-        x, y, leader = candidates[0]
-        return pygame.Rect(x, y, bb_w, bb_h), leader
+        x, y = candidates[0]
+        return pygame.Rect(x, y, bb_w, bb_h)
 
     # ---------------------------------------------------------
     # campo / buracos
@@ -232,18 +269,23 @@ class TelaBugSquashArcade:
         # alterna alvo a cada rodada (BUG -> CORRECT -> BUG -> ...)
         self.target_mode = "BUG" if (self.round_idx % 2 == 0) else "CORRECT"
 
-        # quantas cobras simultâneas? subset aleatório dos buracos
-        total_holes = len(self.holes)
-        min_snakes = max(4, total_holes // 3)
-        max_snakes = max(min_snakes, total_holes - 3)
-        k = random.randint(min_snakes, max_snakes)
+        # quantas cobras simultâneas? entre 4 e 5, evitando vizinhos
+        k = random.randint(self.min_snakes, self.max_snakes)
+        hole_indices = self._choose_non_adjacent_holes(k)
 
-        hole_indices = random.sample(range(total_holes), k=k)
+        # se, por algum motivo, vier menos que o mínimo, tenta completar com buracos não repetidos
+        if len(hole_indices) < self.min_snakes:
+            pool_rest = [i for i in range(len(self.holes)) if i not in hole_indices]
+            random.shuffle(pool_rest)
+            for i in pool_rest:
+                if i not in hole_indices:
+                    hole_indices.append(i)
+                if len(hole_indices) >= self.min_snakes:
+                    break
 
         # alvos da rodada: ~60% do tipo alvo e pelo menos 1
-        num_target = max(1, int(0.6 * k))
-        target_first = random.sample(hole_indices, k=num_target)
-        distractors = [h for h in hole_indices if h not in target_first]
+        num_target = max(1, int(0.6 * len(hole_indices)))
+        target_first = set(random.sample(hole_indices, k=num_target))
 
         def pick_from(pool):
             row = random.choice(pool)
@@ -252,27 +294,19 @@ class TelaBugSquashArcade:
             return code, why
 
         if self.target_mode == "BUG":
-            for hi in target_first:
-                code, why = pick_from(self.pool_bug if self.pool_bug else self.pool_ok)
-                self.spawns.append({"hole_idx": hi, "code": code, "is_bug": True,  "why": why, "hit": False})
-            for hi in distractors:
-                code, why = pick_from(self.pool_ok  if self.pool_ok  else self.pool_bug)
-                self.spawns.append({"hole_idx": hi, "code": code, "is_bug": False, "why": why, "hit": False})
+            for hi in hole_indices:
+                is_target = (hi in target_first)
+                code, why = pick_from(self.pool_bug if is_target else self.pool_ok)
+                self.spawns.append({"hole_idx": hi, "code": code, "is_bug": is_target, "why": why, "hit": False, "label_rect": None})
         else:  # CORRECT
-            for hi in target_first:
-                code, why = pick_from(self.pool_ok  if self.pool_ok  else self.pool_bug)
-                self.spawns.append({"hole_idx": hi, "code": code, "is_bug": False, "why": why, "hit": False})
-            for hi in distractors:
-                code, why = pick_from(self.pool_bug if self.pool_bug else self.pool_ok)
-                self.spawns.append({"hole_idx": hi, "code": code, "is_bug": True,  "why": why, "hit": False})
+            for hi in hole_indices:
+                is_target = (hi in target_first)
+                code, why = pick_from(self.pool_ok if is_target else self.pool_bug)
+                self.spawns.append({"hole_idx": hi, "code": code, "is_bug": not is_target, "why": why, "hit": False, "label_rect": None})
 
-        # --- sons de spawn (agora que self.spawns está preenchida) ---
+        # sons de spawn
         for sp in self.spawns:
-            if sp["is_bug"]:
-                self._SFX("spawn_bug")
-            else:
-                self._SFX("spawn_ok")
-
+            self._SFX("spawn_bug" if sp["is_bug"] else "spawn_ok")
 
     def _next_round_or_finish(self):
         # acabou a rodada atual
@@ -290,7 +324,6 @@ class TelaBugSquashArcade:
         self.round_end_ts = now + self.round_len
         self._compose_round()
 
-
     # ---------------------------------------------------------
     # pontuação / vida
     def _register_hit(self, spawn):
@@ -305,10 +338,10 @@ class TelaBugSquashArcade:
         add = 120 + (self.combo - 1) * 20
         self.score += add
 
-        # --- SONS ---
-        self._SFX("squash")                 # acerto
+        # sons
+        self._SFX("squash")
         if self.combo > 1:
-            self._SFX("combo_up", self.combo)  # qualquer aumento de combo
+            self._SFX("combo_up", self.combo)
 
         # histórico (com fallback de why)
         why = (spawn.get("why") or "").strip()
@@ -321,19 +354,26 @@ class TelaBugSquashArcade:
             self.hits_ok_list.append(item)
         return add
 
-    def _register_miss(self):
-        self._SFX("miss")     # erro
+    def _register_miss(self, reason: str = "", code: str = ""):
+        """Registra erro e guarda motivo em errors_list."""
+        self._SFX("miss")
         self.misses += 1
         self.lives -= 1
         self.combo = 0
         self.score = max(0, self.score - 40)
+
+        # loga no painel "Erros"
+        self.errors_list.append({
+            "code": code or "",
+            "why": (reason or "Erro").strip(),
+            "is_bug": None
+        })
+
         if self.lives <= 0:
             self.running = False
             self.finished = True
-            # fim por vidas -> som de finish (reprovado)
             self._SFX("finish", False, int(self.score))
         return -40
-
 
     # ---------------------------------------------------------
     # efeitos
@@ -354,10 +394,6 @@ class TelaBugSquashArcade:
         return 1 - (1 - t) ** 3
 
     def _blit_rotate(self, surf, img, pivot_pos, origin_pos, angle_deg):
-        """
-        Gira 'img' em torno do ponto 'origin_pos' (coordenada local da imagem),
-        posicionando o pivot em 'pivot_pos' na tela.
-        """
         image_rect = img.get_rect(topleft=(pivot_pos[0] - origin_pos[0], pivot_pos[1] - origin_pos[1]))
         offset_center_to_pivot = pygame.math.Vector2(pivot_pos) - image_rect.center
         rotated_offset = offset_center_to_pivot.rotate(-angle_deg)
@@ -379,16 +415,12 @@ class TelaBugSquashArcade:
                 if t <= fx["dur_mallet"]:
                     tn = t / fx["dur_mallet"]
                     tn = self._ease_out_cubic(tn)
-                    angle = -70 + 90 * tn  # de levantada (-70) até quase 20°
-                    # sprite da marreta
+                    angle = -70 + 90 * tn
                     mallet = pygame.Surface((90, 90), pygame.SRCALPHA)
-                    # cabo
                     pygame.draw.rect(mallet, (140, 100, 60), (44, 8, 8, 66), border_radius=4)
-                    # cabeça
                     head_col = (200, 70, 70) if fx["success"] else (200, 60, 60)
                     pygame.draw.rect(mallet, (30, 20, 20), (26, 48, 42, 18), border_radius=5)
                     pygame.draw.rect(mallet, head_col, (28, 50, 38, 14), border_radius=4)
-                    # pivot: ponta inferior da cabeça
                     pivot_local = (47, 62)
                     self._blit_rotate(tela, mallet, (fx["x"], fx["y"]), pivot_local, angle)
 
@@ -433,7 +465,7 @@ class TelaBugSquashArcade:
         titulo = self.fonte_xl.render("Whack-a-Python", True, (230, 240, 255))
         tela.blit(titulo, (p.x+24, p.y+10))
 
-        # badge (direita)
+        # badge (direita) — mantém cores só nesse badge (não nos códigos)
         alvo_bug = (self.target_mode == "BUG")
         badge_col = (210, 80, 80) if alvo_bug else (80, 170, 110)
         text_col  = (255,255,255)
@@ -454,11 +486,10 @@ class TelaBugSquashArcade:
         subt = self.fonte.render(f"Tópico: {self.topic_title}", True, (190, 210, 245))
         tela.blit(subt, (p.x+24, p.y+10+26))
 
-        # --- temporizador circular (centro do header) ---
+        # temporizador circular
         self._draw_round_timer(tela, header, badge_col)
 
     def _draw_round_timer(self, tela: pygame.Surface, header_rect: pygame.Rect, color_main):
-        """Desenha um anel indicando a fração restante da RODADA."""
         cx = header_rect.centerx
         cy = header_rect.y + header_rect.h // 2
         outer_r = 20
@@ -489,8 +520,8 @@ class TelaBugSquashArcade:
             pygame.draw.ellipse(tela, (20, 20, 28), rect)
             pygame.draw.ellipse(tela, (50, 80, 110), rect, 2)
 
-        # ===== balões sem sobreposição =====
-        placed_bubbles = []
+        # ===== etiquetas (texto) com anticolisão =====
+        placed_labels = []
 
         # cobras (ordena por y do hole para estabilidade visual)
         active_spawns = [s for s in self.spawns if not s["hit"]]
@@ -498,6 +529,7 @@ class TelaBugSquashArcade:
 
         for s in active_spawns:
             rect = self.holes[s["hole_idx"]]
+
             # “cobra” emergindo (desenha primeiro)
             head = pygame.Rect(rect.centerx-18, rect.y-22, 36, 36)
             body = pygame.Rect(rect.centerx-12, rect.y-2, 24, 22)
@@ -510,35 +542,40 @@ class TelaBugSquashArcade:
             pygame.draw.circle(tela, (20,20,20), (head.centerx-6, head.centery-4), 1)
             pygame.draw.circle(tela, (20,20,20), (head.centerx+6, head.centery-4), 1)
 
-            # balão com código (wrap) — agora com anticolisão
+            # bloco de texto (CAIXA neutra em volta do código)
             max_w = int(self.field_rect.w * 0.35)
             lines = self._wrap_text(s["code"], self.fonte_s, max_w)
             lines = lines[:3] + (["..."] if len(lines) > 3 else [])
-            bb_w = max(self.fonte_s.size(l)[0] for l in lines) + 16
-            bb_h = len(lines) * (self.fonte_s.get_height() + 2) + 12
 
-            # gera candidatos e escolhe sem sobreposição
-            candidates = self._bubble_candidates(rect, bb_w, bb_h)
-            bubble, leader = self._place_non_overlapping(candidates, placed_bubbles, bb_w, bb_h, pad=6)
+            # mede o texto
+            text_w = 0
+            for l in lines:
+                w, _ = self.fonte_s.size(l)
+                text_w = max(text_w, w)
+            line_h = self.fonte_s.get_height() + 2
 
-            # desenha balão
-            pygame.draw.rect(tela, (36, 52, 92), bubble, border_radius=8)
-            pygame.draw.rect(tela, (120, 180, 255), bubble, 1, border_radius=8)
+            # dimensões da caixa (usa no anticolisão também)
+            padx, pady = 8, 6
+            box_w = text_w + padx*2
+            box_h = len(lines) * line_h + pady*2
 
-            # texto
-            yy = bubble.y + 6
+            # posiciona sem sobrepor outras caixas
+            candidates = self._label_candidates(rect, box_w, box_h)
+            label_rect = self._place_non_overlapping_label(candidates, placed_labels, box_w, box_h, pad=6)
+            s["label_rect"] = label_rect  # opcional p/ depurar
+
+            # desenha a caixa NEUTRA (igual p/ todos)
+            pygame.draw.rect(tela, (36, 52, 92), label_rect, border_radius=8)        # fundo
+            pygame.draw.rect(tela, (120, 180, 255), label_rect, 1, border_radius=8)  # borda
+
+            # desenha o texto dentro da caixa
+            yy = label_rect.y + pady
             for ln in lines:
                 img = self.fonte_s.render(ln, True, (235, 235, 245))
-                tela.blit(img, (bubble.x + 8, yy))
-                yy += self.fonte_s.get_height() + 2
+                tela.blit(img, (label_rect.x + padx, yy))
+                yy += line_h
 
-            # leader line (linha que liga o hole ao balão)
-            if leader:
-                (ax, ay), (bx, by) = leader
-                pygame.draw.aaline(tela, (120, 180, 255), (ax, ay), (bx, by))
-
-            # registra para evitar colisões nas próximas cobras
-            placed_bubbles.append(bubble)
+            placed_labels.append(label_rect)
 
         # efeitos por cima do campo
         self._draw_hit_fx(tela)
@@ -571,8 +608,8 @@ class TelaBugSquashArcade:
 
         # ===== títulos + cálculo de áreas com altura dividida =====
         title_h = self.fonte_g.get_height() + 2
-        available_boxes = (r.bottom - 12) - (y + title_h + 6 + title_h + 6)
-        box_h = max(60, available_boxes // 2)
+        available_boxes = (r.bottom - 12) - (y + (title_h+6)*3)   # 3 caixas
+        box_h = max(54, available_boxes // 3)
 
         # --- CORRETOS ---
         title = self.fonte_g.render(f"Corretos ({len(self.hits_ok_list)})", True, (130, 230, 160))
@@ -594,6 +631,17 @@ class TelaBugSquashArcade:
             is_bug=True,
             scroll_attr="scroll_bug"
         )
+        y = self._area_bug.bottom + 6
+
+        # --- ERROS --- (novo)
+        title3 = self.fonte_g.render(f"Erros ({len(self.errors_list)})", True, (255, 210, 130))
+        tela.blit(title3, (r.x+14, y)); y += title_h
+        self._area_err = pygame.Rect(r.x+10, y, r.w-20, max(54, r.bottom - 12 - y))
+        self._draw_scroll_list(
+            tela, self._area_err, self.errors_list,
+            is_bug=None,            # None sinaliza "erros"
+            scroll_attr="scroll_err"
+        )
 
         # tooltip (se houver)
         if self._hover_tooltip:
@@ -612,8 +660,8 @@ class TelaBugSquashArcade:
                 tip.blit(s, (8, yy)); yy += self.fonte_s.get_height()+2
             tela.blit(tip, (x, y))
 
-    def _draw_scroll_list(self, tela, area: pygame.Rect, items, is_bug: bool, scroll_attr: str):
-        """Lista com SCROLL (roda do mouse) + barra."""
+    def _draw_scroll_list(self, tela, area: pygame.Rect, items, is_bug, scroll_attr: str):
+        """Lista com SCROLL (roda do mouse) + barra. is_bug=True (bugs), False (corretos), None (erros)."""
         pygame.draw.rect(tela, (28, 42, 64), area, border_radius=8)
         pygame.draw.rect(tela, (80, 140, 220), area, 1, border_radius=8)
 
@@ -637,27 +685,49 @@ class TelaBugSquashArcade:
         first_idx = int(scroll_val // line_h)
         y = area.y - int(scroll_val - first_idx * line_h)
 
-        if is_bug:
+        if is_bug is True:
             self._hist_rects_bug = []
-        else:
+        elif is_bug is False:
             self._hist_rects_ok = []
+        else:
+            self._hist_rects_err = []
 
         inner_w = area.w - 12
         i = first_idx
         while i < len(items) and y < area.bottom:
             it = items[i]
             row_rect = pygame.Rect(area.x+2, y, inner_w-2, line_h-1)
-            base_col = (40, 56, 84) if not is_bug else (48, 52, 80)
+
+            if is_bug is None:
+                base_col = (64, 48, 48)    # erros
+                txt_col  = (240, 230, 210)
+                bullet   = "• "
+            elif is_bug:
+                base_col = (48, 52, 80)    # bugs
+                txt_col  = (235, 225, 225)
+                bullet   = "• "
+            else:
+                base_col = (40, 56, 84)    # corretos
+                txt_col  = (220, 235, 240)
+                bullet   = "• "
+
             pygame.draw.rect(tela, base_col, row_rect, border_radius=6)
 
-            txt = (it.get("code","") or "").replace("\n","  ")
-            wrap = self._wrap_text(txt, self.fonte_s, inner_w - 14)
-            line = wrap[0] + (" ..." if len(wrap) > 1 else "")
-            surf = self.fonte_s.render("• " + line, True, (220, 235, 240) if not is_bug else (235, 225, 225))
+            code_txt = (it.get("code","") or "").replace("\n","  ").strip()
+            why_txt  = (it.get("why","") or "").strip()
+            if code_txt:
+                preview = self._wrap_text(code_txt, self.fonte_s, inner_w - 14)[0]
+                line = f"{preview}"
+            else:
+                line = why_txt or "(sem detalhes)"
+
+            surf = self.fonte_s.render(bullet + line, True, txt_col)
             tela.blit(surf, (row_rect.x+6, row_rect.y + (row_rect.h - surf.get_height())//2))
 
             pair = (row_rect, it)
-            if is_bug:
+            if is_bug is None:
+                self._hist_rects_err.append(pair)
+            elif is_bug:
                 self._hist_rects_bug.append(pair)
             else:
                 self._hist_rects_ok.append(pair)
@@ -731,11 +801,12 @@ class TelaBugSquashArcade:
             if ev.type == pygame.MOUSEMOTION:
                 self._hover_tooltip = ""
                 mx, my = ev.pos
-                for rect, it in (self._hist_rects_ok + self._hist_rects_bug):
+                for rect, it in (self._hist_rects_ok + self._hist_rects_bug + self._hist_rects_err):
                     if rect.collidepoint(mx, my):
-                        self._hover_tooltip = (it.get("why") or "").strip()
-                        if not self._hover_tooltip:
-                            self._hover_tooltip = "Sintaxe/saída válida."
+                        tip = (it.get("why") or "").strip()
+                        if not tip:
+                            tip = "Sintaxe/saída válida."
+                        self._hover_tooltip = tip
                         break
 
             # scroll com roda do mouse
@@ -750,6 +821,10 @@ class TelaBugSquashArcade:
                     content_h_bug = max(0, len(self.hits_bug_list)*line_h)
                     max_scroll_bug = max(0, content_h_bug - self._area_bug.h)
                     self.scroll_bug = max(0.0, min(self.scroll_bug - ev.y*40, float(max_scroll_bug)))
+                if self._area_err.collidepoint(mx, my):
+                    content_h_err = max(0, len(self.errors_list)*line_h)
+                    max_scroll_err = max(0, content_h_err - self._area_err.h)
+                    self.scroll_err = max(0.0, min(self.scroll_err - ev.y*40, float(max_scroll_err)))
 
             # fallback: botões 4/5
             if ev.type == pygame.MOUSEBUTTONDOWN and ev.button in (4, 5):
@@ -764,6 +839,10 @@ class TelaBugSquashArcade:
                     content_h_bug = max(0, len(self.hits_bug_list)*line_h)
                     max_scroll_bug = max(0, content_h_bug - self._area_bug.h)
                     self.scroll_bug = max(0.0, min(self.scroll_bug - (delta/1), float(max_scroll_bug)))
+                if self._area_err.collidepoint(mx, my):
+                    content_h_err = max(0, len(self.errors_list)*line_h)
+                    max_scroll_err = max(0, content_h_err - self._area_err.h)
+                    self.scroll_err = max(0.0, min(self.scroll_err - (delta/1), float(max_scroll_err)))
 
             if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 mx, my = ev.pos
@@ -800,7 +879,8 @@ class TelaBugSquashArcade:
 
                     if clicked_spawn:
                         wanted_bug = (self.target_mode == "BUG")
-                        is_target = (clicked_spawn["is_bug"] == wanted_bug)
+                        clicked_is_bug = clicked_spawn["is_bug"]
+                        is_target = (clicked_is_bug == wanted_bug)
                         impact_x = clicked_rect.centerx if clicked_rect else mx
                         impact_y = (clicked_rect.y) if clicked_rect else my
                         if is_target:
@@ -808,10 +888,16 @@ class TelaBugSquashArcade:
                             gained = self._register_hit(clicked_spawn)
                             self._spawn_hit_fx(impact_x, impact_y, True, f"+{gained}")
                         else:
-                            penalty = self._register_miss()
+                            desired = "BUG" if wanted_bug else "CORRETO"
+                            clicked = "BUG" if clicked_is_bug else "CORRETO"
+                            why = (clicked_spawn.get("why") or "").strip()
+                            reason = f"Rodada pedia {desired}, você clicou em {clicked}."
+                            if why:
+                                reason += f" Motivo do trecho: {why}"
+                            penalty = self._register_miss(reason=reason, code=clicked_spawn["code"])
                             self._spawn_hit_fx(impact_x, impact_y, False, f"{penalty}")
                     else:
-                        # clique vazio dentro do campo = erro (feedback também)
+                        # clique vazio dentro do campo = erro
                         if self.field_rect.collidepoint(mx, my):
-                            penalty = self._register_miss()
+                            penalty = self._register_miss(reason="Clique vazio no campo.", code="")
                             self._spawn_hit_fx(mx, my, False, f"{penalty}")

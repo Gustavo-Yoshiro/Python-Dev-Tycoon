@@ -2,6 +2,19 @@ import pygame
 import random
 import re
 
+# Tenta usar o conteúdo oficial do Python Hero (iniciante + intermediário).
+# Se não encontrar, cai num fallback simples.
+try:
+    # caminho mais comum no teu projeto:
+    from Intermediario.Content.PythonHeroContent import get_hero_pool as _content_get_hero_pool
+except Exception:
+    try:
+        # alternativa se o pacote estiver no mesmo diretório
+        from .PythonHeroContent import get_hero_pool as _content_get_hero_pool
+    except Exception:
+        _content_get_hero_pool = None
+
+
 class TelaMiniPythonHero:
     """
     Minigame (35s). 4 trilhas (A,S,D,F). Uma pergunta por rodada.
@@ -15,14 +28,23 @@ class TelaMiniPythonHero:
       no padrão "cabecalho: \\n    corpo".
     - Diminui a fonte até caber (mín. 12).
     - Se ainda assim não couber, põe '…' no fim e loga um aviso no console.
+
+    >>> Mudança principal:
+    Agora esta tela busca o pool via PythonHeroContent.get_hero_pool(topico),
+    então o conteúdo respeita 100% o roteamento por TÍTULO EXATO normalizado,
+    igual Cobrinha/BugSquash/PyFoot. Sem isso, ela caía num 'base' genérico.
     """
 
-    def __init__(self, largura, altura, jogador, id_fase, nome_topico, on_finish,sfx=None):
+    def __init__(self, largura, altura, jogador, id_fase, nome_topico, on_finish, sfx=None):
         self.largura = largura
         self.altura = altura
         self.jogador = jogador
         self.id_fase = id_fase
+
+        # guardamos o título original (para roteador oficial) e a versão minúscula só para UI
+        self.nome_topico_raw = nome_topico or ""
         self.nome_topico = (nome_topico or "").lower()
+
         self.on_finish = on_finish
         self.sfx = sfx
 
@@ -41,7 +63,7 @@ class TelaMiniPythonHero:
         self.note_pad_y = 6
         self.note_corner = 10
         self.note_line_gap = 2
-        self.max_note_lines = 3   # ← se quiser apenas 2 linhas, troque para 2
+        self.max_note_lines = 3
 
         # trilhas
         self.num_lanes = 4
@@ -84,8 +106,8 @@ class TelaMiniPythonHero:
         # 1 tentativa por rodada
         self.wave_answered = False
 
-        # perguntas por tópico
-        self.pool = self._criar_pool_por_topico(self.nome_topico)
+        # perguntas por tópico (agora via conteúdo oficial)
+        self.pool = self._criar_pool_por_topico(self.nome_topico_raw)
         self.current_prompt = None
         self._prepare_next_prompt()  # primeira rodada
         self._last_tick = now
@@ -97,7 +119,7 @@ class TelaMiniPythonHero:
 
     def _SFX(self, name, *a, **kw):
         s = getattr(self, "sfx", None)
-        if not s: 
+        if not s:
             return
         fn = getattr(s, name, None)
         if callable(fn):
@@ -106,13 +128,14 @@ class TelaMiniPythonHero:
             except Exception:
                 pass
 
-    # ---------- CONTEÚDO (fallback simples) ----------
-    def _criar_pool_por_topico(self, topico):
+    # ---------- CONTEÚDO ----------
+    def _fallback_pool(self):
+        """Pool mínimo caso o import do conteúdo não esteja disponível."""
         def p(prompt, ok, *wrong):
             alts = [{"txt": ok, "ok": True}] + [{"txt": w, "ok": False} for w in wrong]
             return {"prompt": prompt, "alternativas": alts}
 
-        base = [
+        return [
             p("Qual imprime 7?", "print(3+4)", "print(3*4)", "print('7'+1)", "print(7,)"),
             p("Qual concatena 'py' e 'thon'?", "print('py'+'thon')", "print('py','thon')", "print( py + thon )", "print('py'.join('thon'))"),
             p("Qual imprime de 0 a 2 (um por linha)?",
@@ -120,23 +143,21 @@ class TelaMiniPythonHero:
               "for i in range(1,3): print(i)", "for i in [3]: print(i)", "print(range(3))"),
         ]
 
-        topic_only = []
-        if "print" in topico:
-            topic_only = [
-                p("Imprimir exatamente: Hello",
-                  "print('Hello')",
-                  "print(Hello)", "print(\"Hello)", "print('Hello'"),
-                p("Imprimir duas linhas",
-                  "print('Bom dia'); print('Boa tarde')",
-                  "print('Bom dia' 'Boa tarde')", "prit('Bom dia'); prit('Boa tarde')", "print('Bom dia', 'Boa tarde'')"),
-            ]
-        elif "for" in topico:
-            topic_only = [
-                p("Imprimir 0..4",
-                  "for i in range(5): print(i)",
-                  "for i in range 5:\n    print(i)", "for(i in range(5)):\n    print(i)", "print(range(5))"),
-            ]
-        return topic_only if topic_only else base
+    def _criar_pool_por_topico(self, topico_titulo):
+        """
+        Busca o pool do módulo oficial de conteúdo.
+        Se falhar, usa o fallback mínimo acima.
+        """
+        if callable(_content_get_hero_pool):
+            try:
+                pool = _content_get_hero_pool(topico_titulo)
+                # validação leve
+                if isinstance(pool, list) and pool and isinstance(pool[0], dict) and "alternativas" in pool[0]:
+                    return pool
+            except Exception:
+                # se der qualquer erro no conteúdo, seguimos no fallback
+                pass
+        return self._fallback_pool()
 
     # ---------- RODADA ----------
     def _prepare_next_prompt(self):
@@ -149,7 +170,7 @@ class TelaMiniPythonHero:
         wrongs  = [a for a in alts if not a.get("ok")]
         correct = random.choice(corrects) if corrects else {"txt":"...", "ok": True}
         k = min(3, len(wrongs))
-        sampled_wrongs = random.sample(wrongs, k) if k>0 else []
+        sampled_wrongs = random.sample(wrongs, k) if k > 0 else []
 
         alts_sel = [correct] + sampled_wrongs
         random.shuffle(alts_sel)
@@ -159,7 +180,7 @@ class TelaMiniPythonHero:
             if i < len(alts_sel):
                 self._lane_alternativas.append(alts_sel[i])
             else:
-                self._lane_alternativas.append({"txt":"...", "ok": False})
+                self._lane_alternativas.append({"txt": "...", "ok": False})
 
         self.total_correct_notes += 1
         self.wave_answered = False
@@ -221,7 +242,6 @@ class TelaMiniPythonHero:
                 self.score = max(0, self.score - 40)
                 self._add_fx("WRONG", self.lanes[lane].centerx, self.hit_y-10)
                 self._flash_lane(lane, (200,60,60))
-                # --- SFX: erro na nota
                 self._SFX("wrong")
 
             self.notes.remove(n)
@@ -243,7 +263,6 @@ class TelaMiniPythonHero:
                 self._add_fx(tag, self.lanes[lane].centerx, self.hit_y-10)
                 self._flash_lane(lane, (70,200,70))
 
-                # --- SFX: acerto antecipado
                 self._SFX("hit", "good" if early_ratio >= 0.5 else "bad")
                 if self.combo > 1:
                     self._SFX("combo_up", int(self.combo))
@@ -253,7 +272,6 @@ class TelaMiniPythonHero:
                 self.score = max(0, self.score - 40)
                 self._add_fx("WRONG", self.lanes[lane].centerx, self.hit_y-10)
                 self._flash_lane(lane, (200,60,60))
-                # --- SFX: erro na nota
                 self._SFX("wrong")
 
             self.notes.remove(n)
@@ -270,7 +288,6 @@ class TelaMiniPythonHero:
         self.combo = 0
         self.score = max(0, self.score - 30)
         self._add_fx("MISS", (self.lanes[0].x + self.lanes[-1].right)//2, self.hit_y-10)
-        # --- SFX: miss genérico (sem nota/hit válido)
         self._SFX("miss")
 
     # ---------- SPAWN / UPDATE ----------
@@ -282,9 +299,7 @@ class TelaMiniPythonHero:
                 "text": alt["txt"],
                 "correct": bool(alt["ok"])
             })
-            # --- SFX: spawn de nota (1 por trilha)
             self._SFX("spawn_note", int(lane_idx), bool(alt["ok"]))
-
 
     def _add_fx(self, txt, x, y):
         self.fx.append({"txt": txt, "x": x, "y": y, "alpha": 255, "dy": -28})
@@ -316,7 +331,6 @@ class TelaMiniPythonHero:
 
         # terminou a onda atual; espera o "beat" pra começar a próxima
         if not self.notes and (now - self.last_spawn >= self.beat_ms):
-            # --- SFX: fim da onda/pergunta anterior
             self._SFX("wave_end")
             self._prepare_next_prompt()
             self._spawn_notes()
@@ -329,7 +343,6 @@ class TelaMiniPythonHero:
 
         self._update_fx(dt)
 
-
     def _finish(self):
         total_events = max(1, self.hits + self.misses)
         acc = self.hits / total_events
@@ -338,7 +351,6 @@ class TelaMiniPythonHero:
         elif acc >= 0.50: stars = 1
         else: stars = 0
 
-        # --- SFX: fim do minigame (passou se >=1 estrela)
         self._SFX("finish", bool(stars >= 1), int(self.score))
 
         if self.on_finish:
@@ -346,50 +358,29 @@ class TelaMiniPythonHero:
 
     # ---------- NOTAS: QUEBRA CONTROLADA + AUTO-FORMAT ----------
     def _prettify_note_text(self, text: str) -> str:
-        """
-        Regras de formatação amigáveis para leitura rápida no card:
-        - ' | ' → '\\n'
-        - ';'   → '\\n'
-        - '(for|if|elif|else|while|def|try|except) ... : <algo>'  →
-          '(cabecalho):\\n    <algo>'
-        Não corrige sintaxe; só melhora a visualização.
-        """
         t = (text or "").replace(" | ", "\n")
-
-        # quebra por ponto-e-vírgula (com ou sem espaço)
         t = re.sub(r"\s*;\s*", "\n", t)
-
-        # quebra após cabeçalhos com ':' seguidos de conteúdo
-        # exemplo: "for i in range(3): print(i)" -> "for i in range(3):\n    print(i)"
         t = re.sub(
             r"(\b(for|if|elif|else|while|def|try|except)\b[^:\n]*:\s*)(\S)",
             r"\1\n    \3",
             t
         )
-
         return t
 
     def _manual_lines(self, text: str):
-        """Quebra controlada (content + auto-format)."""
         t = self._prettify_note_text(text)
         lines = t.split("\n")
-        # limita o total de linhas para evitar cards gigantes (configurável)
         if len(lines) > self.max_note_lines:
             lines = lines[:self.max_note_lines]
         return lines
 
     def _fit_block_font(self, lines, max_w):
-        """
-        Diminui UM tamanho de fonte para o bloco inteiro até todas as linhas caberem.
-        Não faz word-wrap. Se nem no mínimo couber, marca overflow.
-        """
         size = self.note_font_base_size
         while size >= self.note_font_min_size:
             font = pygame.font.SysFont("Consolas", size)
             if all(font.size(ln)[0] <= max_w for ln in lines):
                 return font, lines, False
             size -= 1
-        # mínimo e ainda não coube: aplica elipse na última linha
         font = pygame.font.SysFont("Consolas", self.note_font_min_size)
         overflow = False
         new_lines = []
@@ -412,20 +403,17 @@ class TelaMiniPythonHero:
         if overflow:
             try:
                 pass
-                #print(f"[PythonHero] Texto longo no card: {text!r} — encurte ou use '\\n'/' | '")
+                # print(f"[PythonHero] Texto longo no card: {text!r}")
             except Exception:
                 pass
 
-        # altura do card
         txt_h = sum(font.get_height() for _ in lines) + self.note_line_gap*(len(lines)-1 if lines else 0)
         card_h = self.note_pad_y*2 + txt_h
         card_rect = pygame.Rect(lane_rect.x+6, int(center_y) - card_h//2, card_w, card_h)
 
-        # base
         pygame.draw.rect(tela, (190, 205, 230), card_rect, border_radius=self.note_corner)
         pygame.draw.rect(tela, (20, 20, 20), card_rect, 2, border_radius=self.note_corner)
 
-        # texto
         y = card_rect.y + self.note_pad_y
         for i, ln in enumerate(lines):
             ts = font.render(ln, True, (0,0,0))

@@ -70,7 +70,7 @@ def crowd_loop(sr, seconds=4):
     t = np.arange(n)/sr
     lfo = (0.75 + 0.25*np.sin(2*np.pi*0.2*t)).astype(np.float32)
     base += sine(200, seconds, sr) * 0.03
-    base = (base * lfo * 0.15).astype(np.float32)
+    base = (base * lfo * 0.9).astype(np.float32)
     return base
 
 def goal_cheer(sr):

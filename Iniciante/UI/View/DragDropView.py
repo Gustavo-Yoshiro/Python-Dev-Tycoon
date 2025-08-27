@@ -76,13 +76,82 @@ class DragDropView:
         return txt.replace("\r\n", " ").replace("\n", " ")
 
     @staticmethod
-    def _rect_no_overlap(test_rect: pygame.Rect, rects, margin=4):
-        # Verifica se test_rect (com "folga") colide com algum rect em rects
-        inflated = test_rect.inflate(margin, margin)
+    def _rect_no_overlap(test_rect: pygame.Rect, rects, margin=6) -> bool:
+        """Retorna True se test_rect NÃO colide com nenhum rect em 'rects', considerando margem bilateral."""
+        a = test_rect.inflate(margin, margin)
         for r in rects:
-            if inflated.colliderect(r):
+            if a.colliderect(r.inflate(margin, margin)):
                 return False
         return True
+
+    @staticmethod
+    def _first_fit_scan(area: pygame.Rect, bw: int, bh: int, placed_rects, margin=6, step=6) -> pygame.Rect | None:
+        """
+        Procura posição livre varrendo a área em “grade”.
+        Garante não sobreposição (com margem). Retorna um Rect ou None.
+        """
+        # varreduras com passos diferentes (começa mais largo, afina se apertado)
+        for st in (step, max(3, step - 2), 2):
+            y = area.y
+            while y <= area.bottom - bh:
+                x = area.x
+                while x <= area.right - bw:
+                    cand = pygame.Rect(x, y, bw, bh)
+                    if DragDropView._rect_no_overlap(cand, placed_rects, margin=margin):
+                        return cand
+                    x += st
+                y += st
+        return None
+
+    @staticmethod
+    def _relax_no_overlap(area: pygame.Rect, rects, margin=6, iters=16):
+        """
+        Pequeno pós-processamento: se algum par ainda encostar (considerando margem),
+        empurra levemente para separar, sem sair da área.
+        """
+        if not rects:
+            return
+        for _ in range(iters):
+            moved = False
+            for i in range(len(rects)):
+                for j in range(i+1, len(rects)):
+                    a = rects[i]
+                    b = rects[j]
+                    ai = a.inflate(margin, margin)
+                    bi = b.inflate(margin, margin)
+                    if ai.colliderect(bi):
+                        # vetor de empurrão simples (horizontal prior)
+                        dx_left  = max(0, (ai.right - bi.left))
+                        dx_right = max(0, (bi.right - ai.left))
+                        dy_up    = max(0, (ai.bottom - bi.top))
+                        dy_down  = max(0, (bi.bottom - ai.top))
+
+                        # escolhe menor afastamento
+                        options = [
+                            ("left",  dx_left),
+                            ("right", dx_right),
+                            ("up",    dy_up),
+                            ("down",  dy_down),
+                        ]
+                        direction, _ = min(options, key=lambda t: t[1])
+
+                        if direction == "left":
+                            b.x = min(b.x + max(1, margin//2), area.right - b.w)
+                        elif direction == "right":
+                            a.x = min(a.x + max(1, margin//2), area.right - a.w)
+                        elif direction == "up":
+                            b.y = min(b.y + max(1, margin//2), area.bottom - b.h)
+                        else:  # down
+                            a.y = min(a.y + max(1, margin//2), area.bottom - a.h)
+
+                        # clampa para ficar dentro
+                        a.x = max(area.x, min(a.x, area.right - a.w))
+                        a.y = max(area.y, min(a.y, area.bottom - a.h))
+                        b.x = max(area.x, min(b.x, area.right - b.w))
+                        b.y = max(area.y, min(b.y, area.bottom - b.h))
+                        moved = True
+            if not moved:
+                break
 
     # ----------------------------
     # Ciclo de vida
@@ -150,12 +219,14 @@ class DragDropView:
         min_w = max(80, int(area_rect.w * 0.28))
         max_w = max(min_w, int(area_rect.w * 0.9))
 
-        rng = random.Random()
-        # usa seed do exercício para não "pular" toda vez
-        seed = (self._exercicio_id if self._exercicio_id is not None else 0) + len(self.disponiveis) * 97
-        rng.seed(seed)
+        attempts_per_block = 180
+        margin = 8
 
-        attempts_per_block = 200
+        # seed base por exercício
+        base_seed = str(self._exercicio_id if self._exercicio_id is not None else 0)
+
+        # >>> Novo: contador por ocorrência de texto (evita RNG idêntico p/ textos repetidos)
+        occ = {}
 
         for bloco in self.disponiveis:
             # largura baseada no texto (limitada)
@@ -164,26 +235,69 @@ class DragDropView:
             bw = max(min_w, min(max_w, txt_w))
             bh = block_h
 
+            k = txt
+            c = occ.get(k, 0)
+            occ[k] = c + 1
+
+            # RNG estável por bloco (id + texto + ocorrência)
+            rng = random.Random(f"{base_seed}|{txt}|{c}")
+
             placed = False
+            # 1) tentativa aleatória com rejeição
             for _ in range(attempts_per_block):
                 x = rng.randint(area_rect.x, max(area_rect.x, area_rect.right - bw))
                 y = rng.randint(area_rect.y, max(area_rect.y, area_rect.bottom - bh))
                 candidate = pygame.Rect(x, y, bw, bh)
-                if self._rect_no_overlap(candidate, rects, margin=6):
+                if self._rect_no_overlap(candidate, rects, margin=margin):
                     rects.append(candidate)
                     placed = True
                     break
 
+            # 2) fallback determinístico (grade first-fit)
             if not placed:
-                # Fallback: empilha (quase não acontece)
-                if rects:
-                    last = rects[-1]
-                    nx = area_rect.x
-                    ny = last.bottom + 6
+                ff = self._first_fit_scan(area_rect, bw, bh, rects, margin=margin, step=6)
+                if ff is not None:
+                    rects.append(ff)
+                    placed = True
+
+            # 3) fallback extra: tenta com margem reduzida e passo menor (ainda SEM sobrepor)
+            if not placed:
+                ff = self._first_fit_scan(area_rect, bw, bh, rects, margin=max(2, margin-4), step=3)
+                if ff is not None:
+                    rects.append(ff)
+                    placed = True
+
+            # 4) último recurso: varredura fina 100% segura (nunca “na marra”)
+            if not placed:
+                ff = self._first_fit_scan(area_rect, bw, bh, rects, margin=0, step=2)
+                if ff is not None:
+                    rects.append(ff)
+                    placed = True
                 else:
-                    nx = area_rect.x
-                    ny = area_rect.y
-                rects.append(pygame.Rect(nx, ny, bw, bh))
+                    # Em áreas EXTREMAMENTE lotadas: força dentro e depois relaxa (ainda sem cruzar)
+                    cand = pygame.Rect(area_rect.x, area_rect.y, bw, bh)
+                    # encontra qualquer x,y que minimize interseção
+                    best = None
+                    best_hits = 10**9
+                    y = area_rect.y
+                    while y <= area_rect.bottom - bh:
+                        x = area_rect.x
+                        while x <= area_rect.right - bw:
+                            cand.topleft = (x, y)
+                            hits = sum(cand.colliderect(r) for r in rects)
+                            if hits < best_hits:
+                                best_hits = hits
+                                best = cand.copy()
+                                if best_hits == 0:
+                                    break
+                            x += 2
+                        if best_hits == 0:
+                            break
+                        y += 2
+                    rects.append(best if best is not None else cand)
+
+        # Pós-processo: pequeno relax para afastar o que encostar pela margem
+        self._relax_no_overlap(area_rect, rects, margin=margin, iters=18)
 
         return rects
 
@@ -193,6 +307,7 @@ class DragDropView:
     def draw(self, tela: pygame.Surface, content_rect: pygame.Rect, feedback_ativo: bool = False):
         """
         Desenha pergunta, dica e as duas colunas dentro de content_rect.
+        Usa clipping na área esquerda para garantir que nada desenhe fora dela.
         """
         if not self.exercicio:
             return
@@ -227,20 +342,22 @@ class DragDropView:
         right_x = x + left_w + gap
 
         # Títulos
-        tela.blit(self.fonte_pequena.render("Blocos disponíveis (bagunça):", True, (200,200,255)), (left_x, y))
-        tela.blit(self.fonte_pequena.render("Sua resposta:", True, (120,255,120)), (right_x, y))
+        tela.blit(self.fonte_pequena.render("Blocos disponíveis (bagunça):", True, (200, 200, 255)), (left_x, y))
+        tela.blit(self.fonte_pequena.render("Sua resposta:", True, (120, 255, 120)), (right_x, y))
 
         y_list = y + 30
 
         # Áreas de cada lado
         left_area = pygame.Rect(left_x, y_list, left_w, content_rect.bottom - y_list - 12)
-        right_area_top = y_list
+        right_area = pygame.Rect(right_x, y_list, right_w, content_rect.bottom - y_list - 12)
 
-        # Fundo leve da área esquerda
+        # Fundo leve e bordas
         pygame.draw.rect(tela, (26, 36, 56), left_area, border_radius=8)
         pygame.draw.rect(tela, (70, 110, 180), left_area, 2, border_radius=8)
+        pygame.draw.rect(tela, (24, 44, 28), right_area, border_radius=8)
+        pygame.draw.rect(tela, (70, 140, 90), right_area, 2, border_radius=8)
 
-        # ----- LADO ESQUERDO (bagunçado)
+        # ----- LADO ESQUERDO (bagunçado) com CLIPPING -----
         area_changed = (self._left_area_rect_last is None) or (self._left_area_rect_last != left_area)
         if area_changed:
             self._left_area_rect_last = left_area.copy()
@@ -251,31 +368,36 @@ class DragDropView:
             self._left_layout_dirty = False
 
         self._left_rects = []
+        old_clip = tela.get_clip()
+        tela.set_clip(left_area)  # nada desenha fora da área esquerda
+
         for i, bloco in enumerate(self.disponiveis):
             if i >= len(self._left_cached_rects):
                 break
             rect = self._left_cached_rects[i]
 
-            # bloco visual
             pygame.draw.rect(tela, (40, 120, 255), rect, border_radius=6)
             pygame.draw.rect(tela, (30, 40, 90), rect, 2, border_radius=6)
 
             texto = self._sanitize_bloco(bloco)
             fonte_b = self.fonte_pequena
-            # encolhe fonte se necessário
             while fonte_b.size(texto)[0] > rect.w - 12 and fonte_b.get_height() > 12:
                 fonte_b = pygame.font.SysFont('Consolas', fonte_b.get_height() - 1)
-            txt_img = fonte_b.render(texto, True, (255,255,255))
+            txt_img = fonte_b.render(texto, True, (255, 255, 255))
             tela.blit(txt_img, (rect.x + 6, rect.y + (rect.h - txt_img.get_height()) // 2))
 
             self._left_rects.append(rect)
 
-        # ----- LADO DIREITO (empilhado)
+        tela.set_clip(old_clip)  # restaura clipping
+
+        # ----- LADO DIREITO (empilhado) -----
         self._right_rects = []
         n_linhas = max(1, len(self.resposta))
-        bloco_altura = max(28, min(35, (content_rect.bottom - right_area_top - 30)//n_linhas)) if n_linhas > 0 else 30
+        # altura adaptativa por quantidade de linhas
+        bloco_altura = max(28, min(35, (right_area.h - 20) // n_linhas)) if n_linhas > 0 else 30
+
         for i, bloco in enumerate(self.resposta):
-            rect = pygame.Rect(right_x, right_area_top + i*bloco_altura, right_w, bloco_altura-5)
+            rect = pygame.Rect(right_area.x, right_area.y + i * bloco_altura, right_area.w, bloco_altura - 5)
             pygame.draw.rect(tela, (80, 210, 80), rect, border_radius=6)
             pygame.draw.rect(tela, (30, 60, 30), rect, 2, border_radius=6)
 
@@ -283,7 +405,7 @@ class DragDropView:
             fonte_b = self.fonte_pequena
             while fonte_b.size(texto)[0] > rect.w - 12 and fonte_b.get_height() > 12:
                 fonte_b = pygame.font.SysFont('Consolas', fonte_b.get_height() - 1)
-            txt_img = fonte_b.render(texto, True, (255,255,255))
+            txt_img = fonte_b.render(texto, True, (255, 255, 255))
             tela.blit(txt_img, (rect.x + 6, rect.y + (rect.h - txt_img.get_height()) // 2))
 
             self._right_rects.append(rect)

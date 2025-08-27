@@ -54,8 +54,8 @@ exercicios = [
 
     Exercicio(
         id_exercicio=None, id_fase=2,
-        dicas="Use input() para ler o nome do usuário e depois imprima Olá, <nome>. Considere que o usuário digita Ana.",
-        pergunta="Dissertativa: Peça ao usuário que digite seu nome usando input() e depois imprima: Olá, <nome>. Considere que o usuário digita Ana. Use input() sem texto dentro dos parênteses.",
+        dicas="Use input() para ler o nome e print para imprimir a entrada do usuário. Cuiado com os espaços",
+        pergunta="Dissertativa: Peça ao usuário que digite seu nome usando input() e depois imprima: Olá, <nome>. Use input() sem texto dentro dos parênteses.",
         tipo="dissertativa",
         resposta_certa='Olá, Ana',
         resposta_erradas=None,
@@ -64,13 +64,13 @@ exercicios = [
 
     Exercicio(
         id_exercicio=None, id_fase=2,
-        dicas="Use input() para ler a cor favorita do usuário e depois imprima: Sua cor favorita é <cor>. Considere que o usuário digita azul.",
-        pergunta="Dissertativa: Peça ao usuário que digite sua cor favorita usando input() e imprima: Sua cor favorita é <cor>. Considere que o usuário digita azul. Use input() sem texto dentro dos parênteses.",
+        dicas="Use input() para ler o valor e armazenar em uma variável. Depois use print() para exibir a mensagem com a variável.",
+        pergunta="Receba a cor favorita do usuário, armazene em uma variável e exiba a mensagem formatada: 'Sua cor favorita é [cor digitada]'.",
         tipo="dissertativa",
         resposta_certa='Sua cor favorita é azul',
         resposta_erradas=None,
         entrada_teste='azul'
-    ),
+        ),
 
     Exercicio(id_exercicio=None, id_fase=2,
         dicas="Arraste os blocos para a ordem correta.",
@@ -97,11 +97,15 @@ exercicios = [
         tipo="objetiva", resposta_certa="cidade = 'São Paulo'",
         resposta_erradas="cidade == 'São Paulo'|let cidade = 'São Paulo'|cidade := 'São Paulo'"),
 
-    Exercicio(id_exercicio=None, id_fase=3,
-        dicas="Crie a variável e exiba seu valor.",
-        pergunta="Dissertativa: Crie uma variável chamada ano, atribua o valor 2025 e mostre o valor dela na tela.",
-        tipo="dissertativa", resposta_certa="2025",
-        resposta_erradas=None),
+    Exercicio(
+        id_exercicio=None, 
+        id_fase=3,
+        dicas="Use o operador de atribuição (=) para armazenar o valor inteiro em qualquer variável e print() para exibir seu conteúdo.",
+        pergunta="Crie uma variável (pode ser chamada de 'ano' ou outro nome) do tipo inteiro, atribua o valor 2025 a ela e exiba o conteúdo desta variável na tela.",
+        tipo="dissertativa", 
+        resposta_certa=2025,
+        resposta_erradas=None
+    ),
 
     Exercicio(id_exercicio=None, id_fase=3,
         dicas="Crie a variável com o valor exato e exiba.",
@@ -142,7 +146,7 @@ exercicios = [
 
     Exercicio(id_exercicio=None, id_fase=4,
         dicas="Use dois input() para receber os números.",
-        pergunta="Dissertativa: Peça dois números ao usuário e imprima a soma deles. Considere que o usuário digita 2 e depois 5. Use input() sem texto dentro dos parênteses.",
+        pergunta="Dissertativa: Peça dois números(inteiros) ao usuário e imprima a soma deles. Considere que o usuário digita 2 e depois 5. Use input() sem texto dentro dos parênteses.",
         tipo="dissertativa", resposta_certa='7',
         resposta_erradas=None,
         entrada_teste='2\n5'
@@ -176,7 +180,7 @@ exercicios = [
 
     Exercicio(id_exercicio=None, id_fase=5,
         dicas="Use if, elif e else para testar todos os casos.",
-        pergunta="Dissertativa: Peça um número ao usuário e imprima 'Positivo' se for maior que zero, 'Zero' se for igual a zero ou 'Negativo' se for menor que zero. Considere que o usuário digita -3. Use input() sem texto dentro dos parênteses.",
+        pergunta="Dissertativa: Peça um número ao usuário e imprima 'Positivo' se for maior que zero, 'Zero' se for igual a zero ou 'Negativo' se for menor que zero. o usuario pode digitar positivo ou negativo. Use input() sem texto dentro dos parênteses.",
         tipo="dissertativa", resposta_certa='Negativo',
         resposta_erradas=None,
         entrada_teste='-3'
@@ -211,11 +215,15 @@ exercicios = [
         tipo="objetiva", resposta_certa="for i in range(1, 4): print(i)",
         resposta_erradas="for i = 1 to 3: print(i)|for i in 1..3: print(i)|for (i = 1; i <= 3; i++): print(i)"),
 
-    Exercicio(id_exercicio=None, id_fase=6,
-        dicas="Use for para repetir uma ação várias vezes.",
-        pergunta="Qual comando repete 5 vezes?",
-        tipo="objetiva", resposta_certa="for i in range(5):",
-        resposta_erradas="for i in 5:|for i in range(1,5):|for i = 1 to 5:"),
+    Exercicio(
+        id_exercicio=None, id_fase=6,
+        dicas="Em Python, range(n) gera 0..n-1 (n valores). O corpo do for vai na linha de baixo, indentado.",
+        pergunta="Qual cabeçalho de for faz o corpo executar exatamente 5 vezes?",
+        tipo="objetiva",
+        resposta_certa="for i in range(5):",
+        resposta_erradas="for i in 5:|for i in range(1,5):|for i = 1 to 5:"
+    ),
+
 
     Exercicio(id_exercicio=None, id_fase=6,
         dicas="Use um laço for para resolver.",
@@ -297,13 +305,25 @@ exercicios = [
         tipo="objetiva", resposta_certa="def dobro(x): return x * 2",
         resposta_erradas="def dobro(x): print(x * 2)|def dobro(): return x * 2|function dobro(x): return x * 2"),
 
-    Exercicio(id_exercicio=None, id_fase=8,
-        dicas="Use return para devolver o valor.",
-        pergunta="Dissertativa: Crie uma função que recebe dois números e imprime a soma deles. Considere que os números passados são 3 e 4. Use input() sem texto dentro dos parênteses.",
-        tipo="dissertativa", resposta_certa='7',
+    Exercicio(
+        id_exercicio=None, id_fase=8,
+        dicas=(
+            "Leia dois números com input() sem mensagem (um por linha), "
+            "converta com int(), crie uma função soma(a, b) que *retorna* a soma "
+            "e então *imprima* o resultado. As entradas vêm em duas linhas separadas."
+        ),
+        pergunta=(
+            "Dissertativa: Escreva uma função soma(a, b) que RETORNE a soma. "
+            "Depois, leia dois números com input() (sem texto nos parênteses), "
+            "um por linha, chame a função e IMPRIMA o resultado. "
+            "Considere que a entrada de teste será:|3|n4"
+        ),
+        tipo="dissertativa",
+        resposta_certa="7",
         resposta_erradas=None,
-        entrada_teste='3\n4'
+        entrada_teste="3\n4"
     ),
+
 
     Exercicio(id_exercicio=None, id_fase=8,
         dicas="Defina uma função que retorna se um número é par.",

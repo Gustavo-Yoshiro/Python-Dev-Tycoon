@@ -38,7 +38,7 @@ class TelaExercicio:
         # Carrega exercícios e progresso do jogador nesta fase
         self.exercicios, progresso = self.exercicio_service.carregar_exercicios(self.id_fase, self.jogador)
         try:
-            if self.id_fase <= 8 and len(self.exercicios) > 4:
+            if self.id_fase <= 16 and len(self.exercicios) > 4:
                 objs  = [e for e in self.exercicios if e.get_tipo().lower() == "objetiva"][:2]
                 diss  = [e for e in self.exercicios if e.get_tipo().lower() == "dissertativa"][:1]
                 drags = [e for e in self.exercicios if e.get_tipo().lower() == "dragdrop"][:1]
@@ -221,7 +221,7 @@ class TelaExercicio:
         tela.blit(t1, (bar1_rect.x+8, bar1_rect.y + (BAR_HEIGHT - t1.get_height()) // 2))
 
         # barra 2 (questões + MG para iniciante)
-        tem_mg = (self.id_fase is not None and self.id_fase <= 8)
+        tem_mg = (self.id_fase is not None and self.id_fase <= 16)
         if tem_mg:
             pygame.draw.rect(tela, (0,0,0,0), bar2_rect)
             seg_total = 5
