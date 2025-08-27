@@ -28,6 +28,17 @@ from Intermediario.Utils.sfx_cobra import SFXCobra
 from Intermediario.Utils.sfx_hero import SFXHero
 
 
+##### free lancer
+# --- FREELANCER (UI + serviços do Intermediário) ---
+from Intermediario.UI.TelaFreelance import TelaFreelance
+from Intermediario.UI.TelaDesenvolvimento import TelaDesenvolvimento
+from Intermediario.Service.Impl.ProjetoFreelanceServiceImpl import ProjetoFreelanceServiceImpl
+from Intermediario.Service.Impl.ClienteServiceImpl import ClienteServiceImpl
+from Intermediario.Service.Impl.JogadorProjetoServiceImpl import JogadorProjetoServiceImpl
+from Intermediario.Service.Impl.ValidacaoServiceImpl import ValidacaoServiceImpl
+
+
+
 
 
 
@@ -56,6 +67,17 @@ class GameManager:
         self.tela_minigame = None
         self.tela_escolha_mg = None
 
+        self._tela_antes_menu = None
+
+        # serviços freelancer
+        self.projeto_service = ProjetoFreelanceServiceImpl()
+        self.cliente_service = ClienteServiceImpl()
+        self.jogador_projeto_service = JogadorProjetoServiceImpl()
+        self.validacao_service = ValidacaoServiceImpl()
+
+        # telas freelancer
+        self.tela_freelance = None
+        self.tela_desenvolvimento = None
         
         self.audio = AudioEngine()   # motor único
         self.sfx = None 
@@ -65,6 +87,13 @@ class GameManager:
 
         #tela intermediario
         self.tela_intermediario = None
+        # hotspot do monitor para abrir o menu do Intermediário
+        self.menu_hotspot = pygame.Rect(
+            int(self.largura * 0.40),
+            int(self.altura  * 0.36),
+            250, 230
+        )
+
 
         #tela loja
         self.tela_loja = None
@@ -144,21 +173,83 @@ class GameManager:
             return self.tela_resultado.painel_visivel
         return False
 
+    def ir_para_freelancer(self):
+        # fecha o menu, se estiver aberto
+        self.tela_intermediario = None
+
+        # descobre se já existe um projeto ativo do jogador
+        projeto_ativo = self.jogador_projeto_service.buscar_projeto_ativo(self.jogador_atual.get_id_jogador())
+
+        projetos_info = []
+        if not projeto_ativo:
+            # lista os projetos elegíveis para este jogador
+            projetos_info = self.projeto_service.listar_projetos_para_jogador(self.jogador_atual)
+
+        # cria a tela principal de freelance (lista ou painel do ativo)
+        self.tela_freelance = TelaFreelance(
+            self.largura, self.altura,
+            projeto_ativo=projeto_ativo,
+            projetos_info=projetos_info,
+            cliente_service=self.cliente_service,
+            callback_abrir_desenvolvimento=self._abrir_desenvolvimento
+        )
+        self.tela_atual = "freelance"
+
+    def fechar_menu_intermediario(self):
+        # fecha o menu e volta pra tela que já estava (introducao/exercicio/resultado)
+        self.tela_intermediario = None
+        if self._tela_antes_menu:
+            self.tela_atual = self._tela_antes_menu
+        #self._tela_antes_menu = None
+
+    def _abrir_desenvolvimento(self, projeto):
+        # se não for o ativo, tenta aceitar primeiro
+        projeto_ativo_atual = self.jogador_projeto_service.buscar_projeto_ativo(self.jogador_atual.get_id_jogador())
+        if not (projeto_ativo_atual and projeto_ativo_atual.get_id_projeto() == projeto.get_id_projeto()):
+            sucesso = self.jogador_projeto_service.aceitar_projeto(self.jogador_atual, projeto)
+            if not sucesso:
+                print("[Freelance] Não foi possível aceitar o projeto.")
+                self.ir_para_freelancer()
+                return
+
+        cliente = self.cliente_service.buscar_cliente_por_id(projeto.get_id_cliente())
+
+        self.tela_desenvolvimento = TelaDesenvolvimento(
+            self.largura, self.altura,
+            projeto=projeto,
+            cliente=cliente,
+            callback_validar=self._validar_solucao_jogador,
+            callback_entregar=self._entregar_projeto,
+            callback_desistir=self._desistir_projeto
+        )
+        self.tela_atual = "desenvolvimento"
+
+
+    def _validar_solucao_jogador(self, projeto, codigo_jogador):
+        print("[Freelance] Validando código...")
+        return self.validacao_service.validar_solucao(projeto, codigo_jogador)
+
+    def _entregar_projeto(self, projeto):
+        self.jogador_projeto_service.finalizar_projeto(self.jogador_atual, projeto)
+        # volta para a lista / painel, já vai refletir como concluído
+        self.ir_para_freelancer()
+
+    def _desistir_projeto(self, projeto):
+        self.jogador_projeto_service.desistir_projeto(self.jogador_atual, projeto)
+        self.ir_para_freelancer()
+
     #testando tela intermediaria
     def is_intermediario(self) -> bool:
         return bool(self.jogador_atual) and 9 <= self.jogador_atual.get_id_fase() <= 16
 
     def abrir_menu_intermediario(self):
-        """Abre o menu principal do Intermediário somente se o jogador estiver no Intermediário."""
         if not self.is_intermediario():
-            # fora do intermediário você pode ignorar ou mandar direto para exercícios
-            # self.iniciar_exercicio()
             return
-
+        self._tela_antes_menu = self.tela_atual
         self.tela_intermediario = TelaIntermediario(
-            callback_exercicios=self._menu_ir_exercicios,
-            callback_freelancer=self.ir_para_freelancer,  # placeholder (abaixo)
-            callback_loja=self.ir_para_loja
+            callback_exercicios=self.mostrar_introducao,
+            callback_freelancer=self.ir_para_freelancer,
+            callback_loja=self.ir_para_loja,
         )
         self.tela_atual = "menu_intermediario"
 
@@ -167,24 +258,17 @@ class GameManager:
         self.tela_intermediario = None
         self.iniciar_exercicio()
 
-    def ir_para_freelancer(self):
-        # TODO: troque pela sua tela real de freelance quando estiver pronta
-        print("[TODO] Tela de Freelance ainda não implementada.")
-        # Exemplo: pode reusar um hub ou retornar à introdução
-        # self.tela_escolha_mg = TelaEscolhaMiniGame(self.largura, self.altura, on_choose=self._iniciar_minigame_escolhido)
-        # self.tela_atual = "escolha_mg"
-        self.mostrar_introducao()
-
-    #aqui fecha
+    
 
 
     def ir_para_loja(self):
+        self.tela_intermediario = None
         self.tela_loja = TelaLoja(
             self.largura,
             self.altura,
             jogador=self.jogador_atual,
             loja_service=self.loja_service,
-            callback_voltar=self.mostrar_introducao
+            callback_voltar=self.fechar_menu_intermediario
         )
         self.tela_atual = "loja"
 
@@ -265,7 +349,16 @@ class GameManager:
             # Atualiza o save no service
             self.save_service.atualizar_save(self.save_atual)
 
+    
+    def _set_fundo(self, path: str):
+        try:
+            img = pygame.image.load(path).convert()
+            self.fundo_principal = pygame.transform.scale(img, (self.largura, self.altura))
+        except Exception as e:
+            print("[WARN] Falha ao carregar fundo:", e)
+
     def mostrar_introducao(self, tela_salva=None):
+        self.tela_intermediario = None
         id_fase = self.id_fases[self.fase_atual]
         fase = self.fase_service.buscar_fase_por_id(id_fase)
 
@@ -274,6 +367,11 @@ class GameManager:
             print(f"[WARN] Fase {id_fase} não encontrada no banco. Encerrando para evitar crash.")
             self.tela_atual = "fim"
             return
+        
+        # >>> TROCA DE FUNDO AQUI <<<
+        bg = "assets/TelaJogoIniciante.png" if id_fase >= 9 else "assets/TelaJogoIniciante.png"
+        self._set_fundo(bg)
+        # <<< FIM TROCA >>>
 
         nome_topico = fase.get_topico()
         descricao = fase.get_introducao()
@@ -685,6 +783,38 @@ class GameManager:
         if botao_voltar.collidepoint(mouse_pos) and mouse_click[0]:
             self.voltar_para_save()
 
+    def desenhar_barra_curso(self):
+        """Barra de progresso do curso (fica sempre visível no Intermediário)."""
+        if not (self.jogador_atual and 9 <= self.jogador_atual.get_id_fase() <= 16):
+            return
+
+        # posição fixa no topo-direito
+        largura_barra = 240
+        altura_barra  = 22
+        x = self.largura - largura_barra - 20
+        y = 20
+
+        # fundo
+        pygame.draw.rect(self.tela, (80, 80, 80), (x, y, largura_barra, altura_barra), border_radius=6)
+
+        # progresso (se tiver curso em andamento)
+        itens_andamento = self.loja_service.listar_em_andamento(self.jogador_atual.get_id_jogador())
+        fonte_barra = pygame.font.SysFont('Arial', 18, bold=True)
+        if itens_andamento:
+            item = itens_andamento[0]
+            duracao_total  = item.get_duracao_total()
+            tempo_restante = item.get_duracao_segundos()
+            progresso = (duracao_total - tempo_restante) / duracao_total if duracao_total > 0 else 0.0
+            pygame.draw.rect(self.tela, (70, 200, 70), (x, y, int(largura_barra * progresso), altura_barra), border_radius=6)
+            txt = fonte_barra.render(f"{item.get_nome()} ({tempo_restante}s)", True, (255, 255, 255))
+        else:
+            txt = fonte_barra.render("Sem curso", True, (200, 200, 200))
+
+        # texto centralizado
+        self.tela.blit(txt, (x + largura_barra // 2 - txt.get_width() // 2,
+                            y + altura_barra // 2 - txt.get_height() // 2))
+
+
     def executar(self):
         """Loop principal do jogo"""
         rodando = True
@@ -708,6 +838,23 @@ class GameManager:
             # Trata eventos
             eventos = pygame.event.get()
             for evento in eventos:
+                # --- TOGGLE do MENU INTERMEDIÁRIO no mesmo hotspot ---
+                if (
+                    self.is_intermediario()
+                    and evento.type == pygame.MOUSEBUTTONUP and evento.button == 1
+                    and self.menu_hotspot.collidepoint(evento.pos)
+                ):
+                    if self.algum_painel_visivel():
+                        # não abre/fecha enquanto introdução/exercício/resultado estiverem visíveis
+                        pass
+                    elif self.tela_atual == "menu_intermediario":
+                        # FECHA sem precisar de callback na classe dele
+                        self.fechar_menu_intermediario()
+                    elif self.tela_atual in ("introducao", "exercicio", "resultado"):
+                        # ABRE e guarda de onde veio
+                        self._tela_antes_menu = self.tela_atual
+                        self.abrir_menu_intermediario()
+
                 if evento.type == pygame.QUIT:
                     rodando = False
                 elif evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE:
@@ -734,6 +881,45 @@ class GameManager:
                 self.tela.blit(self.fundo_principal, (0, 0))
                 self.tela_minigame.tratar_eventos(eventos)
                 self.tela_minigame.desenhar(self.tela)
+
+            elif self.tela_atual == "freelance":
+                self.tela.blit(self.fundo_principal, (0, 0))
+                if self.tela_freelance:
+                    self.tela_freelance.tratar_eventos(eventos)
+                    self.tela_freelance.desenhar(self.tela)
+                    # se a própria tela tiver um 'X' que marca deve_fechar, pode voltar pro menu:
+                    if getattr(self.tela_freelance, "deve_fechar", False):
+                        self.tela_freelance = None
+                        # escolha: voltar ao menu intermediário ou à introdução
+                        #self.mostrar_introducao() 
+                        self.tela_atual = self._tela_antes_menu 
+
+            elif self.tela_atual == "desenvolvimento":
+                self.tela.blit(self.fundo_principal, (0, 0))
+                if self.tela_desenvolvimento:
+                    self.tela_desenvolvimento.tratar_eventos(eventos)
+                    self.tela_desenvolvimento.desenhar(self.tela)
+                    if getattr(self.tela_desenvolvimento, "deve_fechar", False):
+                        self.tela_desenvolvimento = None
+                        self.ir_para_freelancer()
+
+            # Dentro do método executar()
+
+            elif self.tela_atual == "menu_intermediario":
+                self.tela.blit(self.fundo_principal, (0, 0))
+
+                if self.tela_intermediario is not None:
+                    self.tela_intermediario.tratar_eventos(eventos)
+
+                    # Esta verificação agora só vai ser acionada de verdade pelo clique no 'X',
+                    # pois os outros botões destroem o menu antes que este código rode.
+                    if getattr(self.tela_intermediario, 'deve_fechar', False):
+                        self.fechar_menu_intermediario()
+
+                # Apenas desenha o menu se ele ainda existir (não foi fechado por um callback ou pelo 'X')
+                if self.tela_intermediario is not None:
+                    self.tela_intermediario.desenhar(self.tela)
+
 
 
             elif self.tela_atual == "criar_jogador":
@@ -838,15 +1024,17 @@ class GameManager:
                 now = pygame.time.get_ticks()
                 if now - self._last_closed_at >= self.reopen_cooldown_ms:
                     for ev in eventos:
-                        if ev.type == pygame.MOUSEBUTTONUP and ev.button == 1 and self.reopen_hotspot.collidepoint(ev.pos):
-                            if self.tela_atual == "introducao" and not self.tela_introducao.painel_visivel:
-                                self.tela_introducao.painel_visivel = True
-                            elif self.tela_atual == "exercicio" and not self.tela_exercicio.prompt_visivel:
-                                self.tela_exercicio.prompt_visivel = True
-                                #self.tela_exercicio.dragging = False #se tiver problema com arrastar
-                            elif self.tela_atual == "resultado" and not self.tela_resultado.painel_visivel:
-                                self.tela_resultado.painel_visivel = True
+                        # DESATIVANDO A REABERTURA DOS PAINÉIS
+                        # if ev.type == pygame.MOUSEBUTTONUP and ev.button == 1 and self.reopen_hotspot.collidepoint(ev.pos):
+                        #     if self.tela_atual == "introducao" and not self.tela_introducao.painel_visivel:
+                        #         self.tela_introducao.painel_visivel = True
+                        #     elif self.tela_atual == "exercicio" and not self.tela_exercicio.prompt_visivel:
+                        #         self.tela_exercicio.prompt_visivel = True
+                        #         #self.tela_exercicio.dragging = False #se tiver problema com arrastar
+                        #     elif self.tela_atual == "resultado" and not self.tela_resultado.painel_visivel:
+                        #         self.tela_resultado.painel_visivel = True
                         
+                        # A LÓGICA DA PORTA DE SAÍDA CONTINUA FUNCIONANDO
                         if ev.type == pygame.MOUSEBUTTONUP and ev.button == 1 and self.exit_hotspot.collidepoint(ev.pos):
                             if not self.algum_painel_visivel():  
                                 rodando = False
@@ -859,64 +1047,7 @@ class GameManager:
                 self.tela_loja.tratar_eventos(eventos)
                 self.tela_loja.desenhar(self.tela)
 
-            #print(self.tela_atual)
-            #aqui a tela é indrução por enquanto
-            # --- BOTÃO LOJA GLOBAL (aparece em qualquer tela, se jogador for Intermediário) ---
-            if (
-                self.jogador_atual
-                and 9 <= self.jogador_atual.get_id_fase() <= 16
-                and self.tela_atual in ("introducao", "exercicio", "resultado")
-            ):
-                
-                #botao loja
-                botao_loja = pygame.Rect(self.largura - 220, 40, 180, 50)
-                pygame.draw.rect(self.tela, (70, 120, 200), botao_loja, border_radius=8)
-                fonte = pygame.font.SysFont('Arial', 28, bold=True)
-                texto_loja = fonte.render("Loja", True, (255, 255, 255))
-                self.tela.blit(texto_loja, (botao_loja.centerx - texto_loja.get_width()//2,
-                                            botao_loja.centery - texto_loja.get_height()//2))
-
-                # --- Barra de progresso do curso ---
-                itens_andamento = self.loja_service.listar_em_andamento(self.jogador_atual.get_id_jogador())
-
-                largura_barra = 200
-                altura_barra = 20
-                x = botao_loja.left - largura_barra - 20
-                y = botao_loja.centery - altura_barra // 2
-
-                # Fundo da barra (sempre desenha)
-                pygame.draw.rect(self.tela, (80, 80, 80), (x, y, largura_barra, altura_barra), border_radius=6)
-
-                if itens_andamento:
-                    # Existe curso em andamento
-                    item = itens_andamento[0]  # só existe um
-                    duracao_total = item.get_duracao_total()
-                    tempo_restante = item.get_duracao_segundos()
-                    progresso = (duracao_total - tempo_restante) / duracao_total if duracao_total > 0 else 0
-
-                    pygame.draw.rect(self.tela, (70, 200, 70),
-                                    (x, y, int(largura_barra * progresso), altura_barra), border_radius=6)
-
-                    fonte_barra = pygame.font.SysFont('Arial', 18, bold=True)
-                    txt = fonte_barra.render(f"{item.get_nome()} ({tempo_restante}s)", True, (255, 255, 255))
-                else:
-                    # Sem curso em andamento
-                    fonte_barra = pygame.font.SysFont('Arial', 18, bold=True)
-                    txt = fonte_barra.render("Sem curso", True, (200, 200, 200))
-
-                # Texto centralizado na barra
-                self.tela.blit(txt, (x + largura_barra // 2 - txt.get_width() // 2,
-                                    y + altura_barra // 2 - txt.get_height() // 2))
-
-
-                # Clique no botão Loja
-                for ev in eventos:
-                    if ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
-                        if botao_loja.collidepoint(ev.pos):
-                            self.ir_para_loja()
-                        
-
-
+            self.desenhar_barra_curso()
 
             pygame.display.flip()
 
