@@ -11,7 +11,6 @@ class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
         """Função auxiliar para criar um objeto a partir de uma linha do banco."""
         if not row:
             return None
-        # A ordem das colunas no SELECT * deve corresponder a esta ordem
         return JogadorProjeto(
             id_jogador=row[0], 
             id_projeto=row[1], 
@@ -41,7 +40,6 @@ class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
                 con.close()
 
     def buscar(self, id_jogador, id_projeto):
-        """Busca uma relação específica entre jogador e projeto."""
         sql = "SELECT * FROM jogador_projeto WHERE id_jogador = ? AND id_projeto = ?"
         con = None
         try:
@@ -87,7 +85,6 @@ class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
                 con.close()
 
     def atualizar_detalhes(self, id_jogador, id_projeto, novos_detalhes):
-        """Atualiza apenas os detalhes descobertos de uma relação."""
         sql = "UPDATE jogador_projeto SET detalhes_descobertos = ? WHERE id_jogador = ? AND id_projeto = ?"
         parametros = (novos_detalhes, id_jogador, id_projeto)
         con = None
@@ -101,3 +98,21 @@ class JogadorProjetoPersistenciaImpl(JogadorProjetoPersistencia):
         finally:
             if con:
                 con.close()
+
+    def buscar_detalhes(self, id_jogador, id_projeto):
+        """Busca os detalhes descobertos como texto plano."""
+        sql = "SELECT detalhes_descobertos FROM jogador_projeto WHERE id_jogador = ? AND id_projeto = ?"
+        con = None
+        try:
+            con = self.__bd.conectar()
+            cursor = con.cursor()
+            cursor.execute(sql, (id_jogador, id_projeto))
+            resultado = cursor.fetchone()
+            return resultado[0] if resultado and resultado[0] else ""
+        except sqlite3.Error as e:
+            print(f"[ERRO] Falha ao buscar detalhes do projeto: {e}")
+            return ""
+        finally:
+            if con:
+                con.close()
+    

@@ -58,7 +58,7 @@ def main():
     fonte_menu_principal = pygame.font.SysFont("Arial", 24, bold=True)
     
     # --- Funções de Orquestração (Callbacks) ---
-
+    
     def abrir_janela_freelance():
         """Abre a janela principal de freelance, que se adapta se houver um projeto ativo."""
         janelas_abertas.clear()
@@ -135,9 +135,12 @@ def main():
         """Abre o IDE para trabalhar no projeto."""
         janelas_abertas.clear()
         cliente = cliente_service.buscar_cliente_por_id(projeto.get_id_cliente())
+        jogador = jogador_service.buscar_jogador_por_id(JOGADOR_ATUAL.get_id_jogador())
         janela = TelaDesenvolvimento(
             LARGURA, ALTURA,
-            projeto=projeto, cliente=cliente,
+            projeto=projeto,
+            jogador=jogador,
+            cliente=cliente,
             callback_validar=validar_solucao_jogador,
             callback_entregar=entregar_projeto,
             callback_desistir=desistir_projeto

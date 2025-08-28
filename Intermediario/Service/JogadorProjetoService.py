@@ -36,3 +36,23 @@ class JogadorProjetoService(ABC):
         Aplica a lógica de negócio para desistir de um projeto.
         """
         pass
+
+    @abstractmethod
+    def solicitar_detalhes_tecnico(self, jogador, projeto, opcao_dialogo):
+        """
+        Tenta obter detalhes técnicos baseado na opção de diálogo escolhida.
+        Retorna uma tupla: (sucesso: bool, detalhe: str ou None, mensagem: str)
+        """
+        pass
+
+    @abstractmethod
+    def get_detalhes_descobertos(self, id_jogador, id_projeto):
+        """
+        Retorna todos os detalhes técnicos descobertos para um projeto.
+        """
+        pass
+
+    @abstractmethod
+    def atualizar_detalhes(self,id_jogador,id_projeto,novos_detalhes):
+        pass
+

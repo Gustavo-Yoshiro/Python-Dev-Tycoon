@@ -87,3 +87,37 @@ class JogadorProjetoServiceImpl(JogadorProjetoService):
             cliente.set_reputacao(nova_reputacao)
             self.cliente_service.atualizar_cliente(cliente)
             print(f"Penalidade aplicada. Nova reputação com {cliente.get_nome()}: {nova_reputacao:.1f}")
+
+    def solicitar_detalhes_tecnico(self, jogador, projeto, opcao_dialogo):
+        """
+        Tenta obter detalhes técnicos baseado na opção de diálogo escolhida.
+        Retorna (sucesso: bool, detalhe: str ou None, mensagem: str)
+        """
+        if jogador.get_social() < opcao_dialogo.get_req_social():
+            return False, None, f"Social insuficiente! Necessário: {opcao_dialogo.get_req_social()}"
+
+        relacao = self.persistencia.buscar(jogador.get_id_jogador(), projeto.get_id_projeto())
+        if not relacao:
+            return False, None, "Projeto não encontrado"
+
+        detalhe = self._extrair_detalhe_tecnico(opcao_dialogo)
+        if not detalhe:
+            return False, None, "Nenhum detalhe técnico disponível"
+
+        # Adiciona o novo detalhe ao texto existente
+        relacao.set_detalhes_descobertos(detalhe)
+
+        self.persistencia.atualizar_detalhes(
+            jogador.get_id_jogador(),
+            projeto.get_id_projeto(),
+            relacao.get_detalhes_descobertos()
+        )
+
+        return True, detalhe, "Detalhe técnico descoberto!"
+
+    def atualizar_detalhes(self,id_jogador,id_projeto,novos_detalhes):
+        return self.persistencia.atualizar_detalhes(id_jogador,id_projeto,novos_detalhes)
+    
+    def get_detalhes_descobertos(self, id_jogador, id_projeto):
+        """Retorna todos os detalhes técnicos descobertos para um projeto"""
+        return self.persistencia.buscar_detalhes(id_jogador, id_projeto)

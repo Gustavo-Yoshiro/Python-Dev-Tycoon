@@ -1,8 +1,9 @@
 import pygame
 from Intermediario.UI.Janela import Janela
+from Intermediario.Service.Impl.JogadorProjetoServiceImpl import JogadorProjetoServiceImpl
 
 class TelaDesenvolvimento(Janela):
-    def __init__(self, largura_tela, altura_tela, projeto, cliente, callback_validar, callback_entregar, callback_desistir):
+    def __init__(self, largura_tela, altura_tela, projeto,jogador, cliente, callback_validar, callback_entregar, callback_desistir,  detalhes_revelados=None):
         
         painel_w = int(largura_tela * 0.8)
         painel_h = int(altura_tela * 0.85)
@@ -16,11 +17,15 @@ class TelaDesenvolvimento(Janela):
         self.cor_borda = (42, 103, 188)
         self.cor_titulo_bg = (28, 44, 80)
 
+        self.service = JogadorProjetoServiceImpl()
+
+        self.jogador = jogador
         self.projeto = projeto
         self.cliente = cliente
         self.callback_validar = callback_validar
         self.callback_entregar = callback_entregar
         self.callback_desistir = callback_desistir
+        self.detalhes_revelados = detalhes_revelados or []  # Lista de detalhes revelados
 
         # Paleta de Cores e Fontes
         self.COR_TEXTO_PRIMARIO = (255, 190, 0)
@@ -33,11 +38,13 @@ class TelaDesenvolvimento(Janela):
         self.COR_BOTAO_EXECUTAR = (0, 150, 200)
         self.COR_BOTAO_ENTREGAR = (0, 180, 80)
         self.COR_BOTAO_DESISTIR = (180, 40, 40)
+        self.COR_DETALHES = (180, 220, 255)  # Cor para detalhes técnicos
 
         self.fonte_h2 = pygame.font.SysFont('Consolas', 18, bold=True)
         self.fonte_code = pygame.font.SysFont('Consolas', 16)
         self.fonte_terminal = pygame.font.SysFont('Consolas', 14)
         self.fonte_popup = pygame.font.SysFont('Consolas', 16)
+        self.fonte_detalhes = pygame.font.SysFont('Consolas', 14)  # Fonte para detalhes
 
         # Lógica do Editor de Texto
         self.linhas_codigo = projeto.get_codigo_base().split('\n')
@@ -193,17 +200,51 @@ class TelaDesenvolvimento(Janela):
             pygame.draw.rect(tela, (80,80,80), self.scrollbar_h_handle_rect)
             
             dica_surf = self.fonte_terminal.render("Scroll Horizontal: Shift + Roda do Rato", True, (100, 100, 100))
-            tela.blit(dica_surf, (track_h.x, track_h.bottom + 5)) # <-- MUDANÇA AQUI
+            tela.blit(dica_surf, (track_h.x, track_h.bottom + 5))
 
     def desenhar_conteudo(self, tela):
         # --- Painel de Briefing ---
         pygame.draw.rect(tela, self.cor_fundo, self.briefing_rect, border_radius=8)
         cliente_surf = self.fonte_h2.render(f"Cliente: {self.cliente.get_nome()}", True, self.COR_TEXTO_SECUNDARIO)
         tela.blit(cliente_surf, (self.briefing_rect.x + 15, self.briefing_rect.y + 15))
+        
+        # Objetivo do Contrato
         desc_label_surf = self.fonte_h2.render("Objetivo do Contrato:", True, self.COR_TEXTO_PRIMARIO)
         tela.blit(desc_label_surf, (self.briefing_rect.x + 15, self.briefing_rect.y + 50))
-        desc_rect_area = pygame.Rect(self.briefing_rect.x + 15, self.briefing_rect.y + 80, self.briefing_rect.width - 30, 200)
-        self.desenhar_texto_quebra_linha(tela, self.projeto.get_descricao(), desc_rect_area, self.fonte_code, self.COR_TEXTO_CORPO)
+        desc_rect_area = pygame.Rect(self.briefing_rect.x + 15, self.briefing_rect.y + 80, self.briefing_rect.width - 30, 120)
+        y_apos_desc = self.desenhar_texto_quebra_linha(tela, self.projeto.get_descricao(), desc_rect_area, self.fonte_code, self.COR_TEXTO_CORPO)
+        
+        # --- NOVA SEÇÃO: Detalhes Técnicos Revelados ---
+        detalhes_y = y_apos_desc + 20
+        pygame.draw.line(tela, (80, 100, 120), (self.briefing_rect.x + 15, detalhes_y), (self.briefing_rect.right - 15, detalhes_y), 1)
+        self.detalhes_revelados = self.service.get_detalhes_descobertos(self.jogador.get_id_jogador(),self.projeto.get_id_projeto())
+        detalhes_label_surf = self.fonte_h2.render("Detalhes Técnicos:", True, self.COR_TEXTO_PRIMARIO)
+        tela.blit(detalhes_label_surf, (self.briefing_rect.x + 15, detalhes_y + 10))
+        
+        detalhes_rect = pygame.Rect(self.briefing_rect.x + 15, detalhes_y + 40, self.briefing_rect.width - 30, 120)
+        
+        if self.detalhes_revelados.strip():
+            texto_area = pygame.Rect(
+                detalhes_rect.x,
+                detalhes_rect.y,
+                detalhes_rect.width,
+                detalhes_rect.height
+            )
+            self.desenhar_texto_quebra_linha(
+                tela,
+                self.detalhes_revelados,
+                texto_area,
+                self.fonte_detalhes,
+                self.COR_DETALHES
+            )
+        else:
+            nenhum_surf = self.fonte_detalhes.render(
+                "Nenhum detalhe técnico foi descoberto ainda.",
+                True,
+                (150, 150, 150)
+            )
+            tela.blit(nenhum_surf, (detalhes_rect.x, detalhes_rect.y))
+
 
         # --- Painel do Editor de Código ---
         self._desenhar_editor(tela)
@@ -360,3 +401,8 @@ class TelaDesenvolvimento(Janela):
     def tratar_eventos(self, eventos):
         super().tratar_eventos(eventos)
         self.tratar_eventos_conteudo(eventos)
+
+    def adicionar_detalhe(self, detalhe):
+        """Adiciona um novo detalhe técnico revelado pelo cliente"""
+        if detalhe not in self.detalhes_revelados:
+            self.detalhes_revelados.append(detalhe)

@@ -1,5 +1,85 @@
 import pygame
+import os
 from Intermediario.UI.Janela import Janela
+
+class PopupSkillInsuficiente:
+    def __init__(self, x, y, largura, altura, callback_fechar=None):
+        self.rect = pygame.Rect(x, y, largura, altura)
+        self.visivel = False
+        self.cor_fundo = (28, 34, 42)
+        self.cor_borda = (220, 50, 50)
+        self.cor_texto = (255, 190, 0)
+        self.cor_botao = (40, 50, 65)
+        self.cor_botao_hover = (50, 60, 75)
+        
+        self.fonte_titulo = pygame.font.SysFont('Consolas', 20, bold=True)
+        self.fonte_botao = pygame.font.SysFont('Consolas', 16)
+        
+        # Criar botão de fechar
+        botao_largura = 100
+        botao_altura = 40
+        botao_x = self.rect.centerx - botao_largura // 2
+        botao_y = self.rect.bottom - 60
+        self.botao_fechar_rect = pygame.Rect(botao_x, botao_y, botao_largura, botao_altura)
+        
+        # Callback para quando fechar (para mover o mouse)
+        self.callback_fechar = callback_fechar
+    
+    def mostrar(self):
+        self.visivel = True
+    
+    def fechar(self):
+        self.visivel = False
+        # Chama o callback quando fechar, se existir
+        if self.callback_fechar:
+            self.callback_fechar()
+    
+    def desenhar(self, tela):
+        if not self.visivel:
+            return
+        
+        # Desenhar fundo do popup
+        pygame.draw.rect(tela, self.cor_fundo, self.rect, border_radius=10)
+        pygame.draw.rect(tela, self.cor_borda, self.rect, width=3, border_radius=10)
+        
+        # Desenhar título
+        titulo_surf = self.fonte_titulo.render("Skills Insuficientes!", True, self.cor_texto)
+        tela.blit(titulo_surf, (self.rect.centerx - titulo_surf.get_width() // 2, self.rect.y + 30))
+        
+        # Desenhar mensagem
+        mensagem = "Você não possui as skills necessárias"
+        mensagem2 = "para aceitar este projeto."
+        mensagem_surf = self.fonte_botao.render(mensagem, True, (200, 200, 200))
+        mensagem2_surf = self.fonte_botao.render(mensagem2, True, (200, 200, 200))
+        tela.blit(mensagem_surf, (self.rect.centerx - mensagem_surf.get_width() // 2, self.rect.y + 70))
+        tela.blit(mensagem2_surf, (self.rect.centerx - mensagem2_surf.get_width() // 2, self.rect.y + 90))
+        
+        # Desenhar botão de fechar
+        mouse_pos = pygame.mouse.get_pos()
+        botao_cor = self.cor_botao_hover if self.botao_fechar_rect.collidepoint(mouse_pos) else self.cor_botao
+        pygame.draw.rect(tela, botao_cor, self.botao_fechar_rect, border_radius=8)
+        texto_botao = self.fonte_botao.render("Fechar", True, (200, 200, 200))
+        tela.blit(texto_botao, (self.botao_fechar_rect.centerx - texto_botao.get_width() // 2, 
+                               self.botao_fechar_rect.centery - texto_botao.get_height() // 2))
+    
+    def tratar_evento(self, evento):
+        if not self.visivel:
+            return False
+        
+        # Consome todos os eventos de mouse quando visível
+        if evento.type in [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION]:
+            # Verifica se o evento ocorreu dentro do popup
+            if self.rect.collidepoint(evento.pos):
+                if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
+                    if self.botao_fechar_rect.collidepoint(evento.pos):
+                        self.fechar()
+                return True  # Consome o evento
+            else:
+                # Evento fora do popup - ainda consome para não passar para trás
+                return True
+        
+        return False
+
 
 class TelaFreelance(Janela):
     def __init__(self, largura_tela, altura_tela, projeto_ativo, projetos_info, cliente_service, callback_abrir_desenvolvimento):
@@ -41,6 +121,10 @@ class TelaFreelance(Janela):
         self.fonte_logo = pygame.font.SysFont('Consolas', 32, bold=True)
         self.fonte_tag = pygame.font.SysFont('Consolas', 14, bold=True)
         
+        # --- Cache de imagens de logo ---
+        self.logo_images = {}
+        self._carregar_logos()
+        
         # --- NOVO: Lógica de Filtro ---
         self.filtro_ativo = "Todos"
         self.projetos_filtrados = []
@@ -58,8 +142,71 @@ class TelaFreelance(Janela):
 
         self.rects_projetos = {}
         self.cache_clientes = {}
+        
+        # Criar popup para skills insuficientes
+        popup_largura = 400
+        popup_altura = 200
+        popup_x = (largura_tela - popup_largura) // 2
+        popup_y = (altura_tela - popup_altura) // 2
+        
+        # Passa callback para mover o mouse quando o popup fechar
+        self.popup_skill_insuficiente = PopupSkillInsuficiente(
+            popup_x, popup_y, popup_largura, popup_altura, 
+            callback_fechar=self._ao_fechar_popup
+        )
+        
         self._aplicar_filtro() # Aplica o filtro inicial
         self.atualizar_handle_scrollbar()
+
+    def _carregar_logos(self):
+        """Carrega as imagens de logo dos clientes"""
+        try:
+            # IDs 1-4: clientes1.png
+            img1 = pygame.image.load("Assets/Logo/Clientes1.png").convert_alpha()
+            self.logo_images[1] = img1
+            self.logo_images[2] = img1
+            self.logo_images[3] = img1
+            self.logo_images[4] = img1
+            
+            # IDs 5-7: clientes2.png
+            img2 = pygame.image.load("Assets/Logo/Clientes2.png").convert_alpha()
+            self.logo_images[5] = img2
+            self.logo_images[6] = img2
+            self.logo_images[7] = img2
+            
+            # IDs 8-10: clientes3.png
+            img3 = pygame.image.load("Assets/Logo/Clientes3.png").convert_alpha()
+            self.logo_images[8] = img3
+            self.logo_images[9] = img3
+            self.logo_images[10] = img3
+            
+            # IDs 11-13: clientes4.png
+            img4 = pygame.image.load("Assets/Logo/Clientes4.png").convert_alpha()
+            self.logo_images[11] = img4
+            self.logo_images[12] = img4
+            self.logo_images[13] = img4
+            
+        except pygame.error as e:
+            print(f"Erro ao carregar imagens de logo: {e}")
+            # Fallback: usa cores sólidas se as imagens não carregarem
+            self.logo_images = {}
+
+    def _get_logo_para_cliente(self, cliente_id):
+        """Retorna a imagem de logo apropriada para o ID do cliente"""
+        if cliente_id in self.logo_images:
+            return self.logo_images[cliente_id]
+        
+        # Fallback: retorna None se não encontrar imagem
+        return None
+
+    def _ao_fechar_popup(self):
+        """Callback chamado quando o popup é fechado - move o mouse para o X da janela"""
+        # Calcula a posição do botão de fechar da janela
+        botao_fechar_x = self.rect.right - 30
+        botao_fechar_y = self.rect.y + 10
+        
+        # Move o mouse para o botão de fechar
+        pygame.mouse.set_pos((botao_fechar_x, botao_fechar_y))
 
     def _aplicar_filtro(self):
         """Filtra a lista de projetos com base no filtro ativo."""
@@ -102,12 +249,17 @@ class TelaFreelance(Janela):
             pygame.draw.rect(tela, self.COR_TEXTO_PRIMARIO, handle_abs, border_radius=7)
 
     def desenhar(self, tela):
-        if not self.visivel: return
+        if not self.visivel: 
+            return
+            
         self.desenhar_base(tela)
         if self.projeto_ativo:
             self._desenhar_painel_projeto_ativo(tela)
         else:
             self._desenhar_lista_projetos(tela)
+        
+        # Desenhar popup se estiver visível (fica por cima de tudo)
+        self.popup_skill_insuficiente.desenhar(tela)
 
     def _desenhar_painel_projeto_ativo(self, tela):
         cliente = self._get_cliente(self.projeto_ativo.get_id_cliente())
@@ -173,11 +325,20 @@ class TelaFreelance(Janela):
             logo_rect = pygame.Rect(card_rect.x + 10, card_rect.y + 10, 60, 60)
             cliente = self._get_cliente(projeto.get_id_cliente())
             cliente_nome = cliente.get_nome() if cliente else "N/A"
-            cor_logo_fundo = self.CORES_LOGO[projeto.get_id_cliente() % len(self.CORES_LOGO)]
-            pygame.draw.rect(tela, cor_logo_fundo, logo_rect, border_radius=5)
-            inicial = cliente_nome[0].upper() if cliente_nome != "N/A" else "?"
-            inicial_surf = self.fonte_logo.render(inicial, True, (255, 255, 255))
-            tela.blit(inicial_surf, (logo_rect.centerx - inicial_surf.get_width() / 2, logo_rect.centery - inicial_surf.get_height() / 2))
+            
+            # --- NOVO: Usa imagem de logo em vez de cor sólida ---
+            logo_image = self._get_logo_para_cliente(projeto.get_id_cliente())
+            if logo_image:
+                # Redimensiona a imagem para caber no retângulo
+                logo_image_scaled = pygame.transform.scale(logo_image, (logo_rect.width, logo_rect.height))
+                tela.blit(logo_image_scaled, logo_rect.topleft)
+            else:
+                # Fallback: cor sólida se não houver imagem
+                cor_logo_fundo = self.CORES_LOGO[projeto.get_id_cliente() % len(self.CORES_LOGO)]
+                pygame.draw.rect(tela, cor_logo_fundo, logo_rect, border_radius=5)
+                inicial = cliente_nome[0].upper() if cliente_nome != "N/A" else "?"
+                inicial_surf = self.fonte_logo.render(inicial, True, (255, 255, 255))
+                tela.blit(inicial_surf, (logo_rect.centerx - inicial_surf.get_width() / 2, logo_rect.centery - inicial_surf.get_height() / 2))
 
             info_x = logo_rect.right + 15
             
@@ -205,6 +366,16 @@ class TelaFreelance(Janela):
     def tratar_eventos(self, eventos):
         super().tratar_eventos(eventos)
         
+        # Primeiro, verifica se o popup está visível e trata seus eventos
+        if self.popup_skill_insuficiente.visivel:
+            evento_consumido = False
+            for evento in eventos:
+                if self.popup_skill_insuficiente.tratar_evento(evento):
+                    evento_consumido = True
+            # Se o popup está visível, não processa outros eventos da tela
+            if evento_consumido:
+                return
+        
         max_scroll = len(self.projetos_filtrados) - self.max_visiveis if self.projetos_filtrados else 0
 
         for evento in eventos:
@@ -230,23 +401,30 @@ class TelaFreelance(Janela):
             
             elif evento.type == pygame.MOUSEBUTTONUP and evento.button == 1:
                 self.dragging_scrollbar = False
+                
+                # Verifica se o clique foi dentro do painel
+                if not self.rect.collidepoint(evento.pos):
+                    continue
+                    
                 if self.projeto_ativo:
                     if hasattr(self, 'botao_abrir_dev_rect') and self.botao_abrir_dev_rect.collidepoint(evento.pos):
                         self.callback_abrir_desenvolvimento(self.projeto_ativo)
                         self.deve_fechar = True
                 else: # Modo lista
-                    # --- NOVO: Checa cliques nos filtros ---
+                    # Checa cliques nos filtros
                     for filtro, rect in self.botoes_filtro_rects.items():
                         if rect.collidepoint(evento.pos):
                             self.filtro_ativo = filtro
                             self._aplicar_filtro()
-                            return # Consome o clique
+                            return  # Consome o clique
 
+                    # Checa cliques nos projetos
                     for info_clique in self.rects_projetos.values():
                         if info_clique["rect"].collidepoint(evento.pos):
                             if info_clique["info"]["pode_aceitar"]:
                                 self.callback_abrir_desenvolvimento(info_clique["info"]["projeto"])
                                 self.deve_fechar = True
                             else:
-                                print("Skills insuficientes!")
-                            return
+                                # Mostra popup em vez de imprimir no console
+                                self.popup_skill_insuficiente.mostrar()
+                            return  # Consome o clique

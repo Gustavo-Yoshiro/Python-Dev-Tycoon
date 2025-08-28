@@ -1,5 +1,7 @@
 import pygame
 from Intermediario.UI.Janela import Janela
+from Intermediario.Service.Impl.JogadorProjetoServiceImpl import JogadorProjetoServiceImpl
+from Intermediario.Service.Impl.DialogoServiceImpl import DialogoServiceImpl
 
 class TelaProjeto(Janela):
     def __init__(self, largura_tela, altura_tela, projeto, cliente, jogador, mensagens, 
@@ -26,6 +28,9 @@ class TelaProjeto(Janela):
         self.callback_enviar_mensagem = callback_enviar_mensagem
         self.callback_voltar = callback_voltar
         self.detalhes_adicionais = detalhes_adicionais
+        
+        self.service = JogadorProjetoServiceImpl()
+        self.serviceNo = DialogoServiceImpl()
 
         # Paleta de Cores e Fontes
         self.COR_TEXTO_PRIMARIO = (255, 190, 0)
@@ -73,6 +78,10 @@ class TelaProjeto(Janela):
 
     def desenhar_conteudo(self, tela):
         mouse_pos = pygame.mouse.get_pos()
+        fundo_transparente = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
+        fundo_transparente.fill((20, 20, 30, 180))  # tom escuro com transparência
+        tela.blit(fundo_transparente, self.rect.topleft)
+
         
         # --- Seção 1: Perfil do Cliente (Topo) ---
         area_cliente = pygame.Rect(self.rect.x + 20, self.rect.y + 40, self.rect.width - 40, 64)
@@ -189,6 +198,13 @@ class TelaProjeto(Janela):
                 for opcao, rect in self.botoes_dialogo_rects.items():
                     if rect.collidepoint(evento.pos):
                         self.callback_enviar_mensagem(self.projeto, opcao)
+                        if opcao.get_efeito() is not None and "REVELAR_DETALHES" in opcao.get_efeito():
+                            id_no = opcao.get_id_no_destino()
+                            no = self.serviceNo.buscar_proximo_no(id_no)
+                            detalhe_tecnico = no.get_texto_npc()
+                            self.service.atualizar_detalhes(self.jogador.get_id_jogador(),self.projeto.get_id_projeto(),detalhe_tecnico)
+                        else:
+                            pass
                         self.deve_fechar = True; return
 
     def tratar_eventos(self, eventos):

@@ -21,3 +21,7 @@ class JogadorProjetoPersistencia(ABC):
     @abstractmethod
     def atualizar_detalhes(self, id_jogador, id_projeto, novos_detalhes):
         pass
+
+    @abstractmethod
+    def buscar_detalhes(self, id_jogador, id_projeto):
+        pass
