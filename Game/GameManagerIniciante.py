@@ -360,7 +360,7 @@ class GameManager:
 
     #testando tela intermediaria
     def is_intermediario(self) -> bool:
-        return bool(self.jogador_atual) and 9 <= self.jogador_atual.get_id_fase() <= 16
+        return 9 <= self.id_fases[self.fase_atual] <= 16
 
     def abrir_menu_intermediario(self):
         if not self.is_intermediario():
@@ -913,7 +913,8 @@ class GameManager:
                     ganho = 10  # se quiser somar as estrelas: 10 + self.bonus_backend_iniciante
                     self.jogador_atual.set_backend(backend_atual + ganho)
                     self.jogador_atual.set_social(social_atual + 5)
-                    self.jogador_atual.set_frontend(social_atual + 5)
+                    self.jogador_atual.set_frontend(frontend_atual + 5)
+                    self.jogador_atual.set_dinheiro(200)
                     self.jogador_service.atualizar_jogador(self.jogador_atual)
                     self.bonus_backend_iniciante = 0
 
@@ -934,6 +935,7 @@ class GameManager:
             # Avança em memória e no BD
             self.fase_atual = proximo_idx
             self.jogador_service.avancar_fase_jogador(self.jogador_atual.get_id_jogador())
+            self.jogador_atual = self.jogador_service.buscar_jogador_por_id( self.jogador_atual.get_id_jogador() )
 
             # Anti-revisita: cria/garante progresso 'stub' na NOVA fase
             self.progresso_service.salvar_ou_atualizar_progresso(
@@ -1313,7 +1315,11 @@ class GameManager:
                 self.tela_loja.tratar_eventos(eventos)
                 self.tela_loja.desenhar(self.tela)
 
-            if self.jogador_atual and 9 <= self.jogador_atual.get_id_fase() <= 16:
+            current_id = self.id_fases[self.fase_atual] if self.jogador_atual else 0
+            if (
+                9 <= current_id <= 16
+                and self.tela_atual not in ("historia", "historia_inter")
+            ):
                 itens_andamento = self.loja_service.listar_em_andamento(self.jogador_atual.get_id_jogador())
                 self.hud.desenhar(self.tela, self.jogador_atual, itens_andamento)
 
