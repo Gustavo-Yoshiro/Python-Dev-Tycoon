@@ -37,6 +37,9 @@ from Intermediario.Service.Impl.ClienteServiceImpl import ClienteServiceImpl
 from Intermediario.Service.Impl.JogadorProjetoServiceImpl import JogadorProjetoServiceImpl
 from Intermediario.Service.Impl.ValidacaoServiceImpl import ValidacaoServiceImpl
 
+#elementos tela inter
+from Intermediario.UI.HUDIntermediario import HUDIntermediario
+
 
 
 
@@ -123,9 +126,7 @@ class GameManager:
             230   # altura
         )
         self.debug_hotspot = False
-        # Hotspot do notebook em PORCENTAGEM da tela (ajuste fino depois)
-        #self.hotspot_pct = pygame.Rect(0.62, 0.38, 0.18, 0.15)  # x%, y%, w%, h%
-        #self.debug_hotspot = False  # True = desenha contorno pra calibrar
+        
 
         # cooldown pra evitar reabrir no mesmo clique
         self._last_closed_at = 0
@@ -162,6 +163,21 @@ class GameManager:
         self.tela_exercicio = None
         self.tela_resultado = None
         self.tela_exercicio_salva = None
+
+        ####testando video
+        try:
+            import cv2 as _cv2
+        except Exception:
+            _cv2 = None
+        self.cv2 = _cv2
+
+        self._bg_video_cap = None
+        self._bg_video_frame_ms = 0
+        self._bg_video_accum_ms = 0
+        self._bg_video_size = (self.largura, self.altura)
+
+        self.hud = HUDIntermediario(self.largura, self.altura)
+
 
     #alem do exit da para usar em outros se precisar
     def algum_painel_visivel(self):
@@ -351,11 +367,65 @@ class GameManager:
 
     
     def _set_fundo(self, path: str):
+        """Se path for vídeo, liga modo vídeo; senão, carrega imagem normal."""
+        # Fecha vídeo anterior, se existir
+        if self._bg_video_cap is not None:
+            try:
+                self._bg_video_cap.release()
+            except Exception:
+                pass
+            self._bg_video_cap = None
+            self._bg_video_frame_ms = 0
+            self._bg_video_accum_ms = 0
+
+        ext = path.lower().rsplit('.', 1)[-1]
+        if ext in ("mp4", "avi", "mov", "mkv", "webm") and self.cv2 is not None:
+            cap = self.cv2.VideoCapture(path)
+            if cap.isOpened():
+                fps = cap.get(self.cv2.CAP_PROP_FPS) or 30.0
+                self._bg_video_cap = cap
+                self._bg_video_frame_ms = max(1, int(1000.0 / fps))
+                # carrega o primeiro frame pra já desenhar algo
+                self._update_fundo(0)  # força primeira leitura
+                return
+
+        # fallback: imagem estática
         try:
             img = pygame.image.load(path).convert()
             self.fundo_principal = pygame.transform.scale(img, (self.largura, self.altura))
         except Exception as e:
-            print("[WARN] Falha ao carregar fundo:", e)
+            print("[WARN] Falha ao carregar fundo estático:", e)
+            self.fundo_principal = pygame.Surface((self.largura, self.altura))
+            self.fundo_principal.fill((20, 20, 30))
+
+    def _update_fundo(self, dt_ms: int):
+            """Atualiza o frame do vídeo de fundo (se houver)."""
+            if self._bg_video_cap is None:
+                return
+            self._bg_video_accum_ms += dt_ms
+            if self._bg_video_accum_ms < self._bg_video_frame_ms:
+                return
+            self._bg_video_accum_ms = 0
+
+            ok, frame = self._bg_video_cap.read()
+            if not ok:
+                # loop
+                self._bg_video_cap.set(self.cv2.CAP_PROP_POS_FRAMES, 0)
+                ok, frame = self._bg_video_cap.read()
+                if not ok:
+                    return
+
+            # BGR -> RGB
+            frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
+            # resize para tela
+            frame = self.cv2.resize(frame, self._bg_video_size, interpolation=self.cv2.INTER_LINEAR)
+
+            # cria Surface sem cópia extra (frombuffer)
+            surf = pygame.image.frombuffer(frame.tobytes(), self._bg_video_size, "RGB")
+            # importante: converter para a mesma pixel format do display (evita bugs de alpha)
+            self.fundo_principal = surf.convert()
+
+
 
     def mostrar_introducao(self, tela_salva=None):
         self.tela_intermediario = None
@@ -369,7 +439,16 @@ class GameManager:
             return
         
         # >>> TROCA DE FUNDO AQUI <<<
-        bg = "assets/TelaJogoIniciante.png" if id_fase >= 9 else "assets/TelaJogoIniciante.png"
+        if id_fase <= 8:
+            bg = "assets/Personagem_Bebendo_Café_em_Anime.mp4"   # seu vídeo
+            self.exit_hotspot.update(
+            int(self.largura * 0.08),
+            int(self.altura  * 0.28),
+            int(self.largura * 0.05),
+            int(self.altura  * 0.48)
+        )
+        else:
+            bg = "assets/TelaJogoIniciante.png"  # sua imagem atual ou outro vídeo se quiser
         self._set_fundo(bg)
         # <<< FIM TROCA >>>
 
@@ -694,8 +773,12 @@ class GameManager:
                 # >>> bônus ao encerrar o INICIANTE (fase 8)
                 if fase_concluida == 8:
                     backend_atual = self.jogador_atual.get_backend()
+                    social_atual = self.jogador_atual.get_social()
+                    frontend_atual = self.jogador_atual.get_frontend()
                     ganho = 10  # se quiser somar as estrelas: 10 + self.bonus_backend_iniciante
                     self.jogador_atual.set_backend(backend_atual + ganho)
+                    self.jogador_atual.set_social(social_atual + 5)
+                    self.jogador_atual.set_frontend(social_atual + 5)
                     self.jogador_service.atualizar_jogador(self.jogador_atual)
                     self.bonus_backend_iniciante = 0
 
@@ -837,23 +920,32 @@ class GameManager:
                         self.loja_service.atualizar_item(item)
             # Trata eventos
             eventos = pygame.event.get()
+            
             for evento in eventos:
                 # --- TOGGLE do MENU INTERMEDIÁRIO no mesmo hotspot ---
                 if (
-                    self.is_intermediario()
-                    and evento.type == pygame.MOUSEBUTTONUP and evento.button == 1
+                    evento.type == pygame.MOUSEBUTTONUP and evento.button == 1
                     and self.menu_hotspot.collidepoint(evento.pos)
                 ):
                     if self.algum_painel_visivel():
-                        # não abre/fecha enquanto introdução/exercício/resultado estiverem visíveis
+                        # não faz nada se um painel modal estiver aberto
                         pass
                     elif self.tela_atual == "menu_intermediario":
-                        # FECHA sem precisar de callback na classe dele
+                        # se já está no menu, fecha
                         self.fechar_menu_intermediario()
                     elif self.tela_atual in ("introducao", "exercicio", "resultado"):
-                        # ABRE e guarda de onde veio
-                        self._tela_antes_menu = self.tela_atual
-                        self.abrir_menu_intermediario()
+                        if self.is_intermediario():
+                            # 9..16 → abre o menu do Intermediário
+                            self._tela_antes_menu = self.tela_atual
+                            self.abrir_menu_intermediario()
+                        else:
+                            # 1..8 → reabre o painel da tela atual
+                            if self.tela_atual == "introducao" and self.tela_introducao:
+                                self.tela_introducao.painel_visivel = True
+                            elif self.tela_atual == "exercicio" and self.tela_exercicio:
+                                self.tela_exercicio.prompt_visivel = True
+                            elif self.tela_atual == "resultado" and self.tela_resultado:
+                                self.tela_resultado.painel_visivel = True
 
                 if evento.type == pygame.QUIT:
                     rodando = False
@@ -864,7 +956,8 @@ class GameManager:
                 break
 
            
-
+            self._update_fundo(dt)
+            self.tela.blit(self.fundo_principal, (0, 0))
             # Renderização condicional das telas
             if self.tela_atual == "inicio":
                 self.tela_inicio.tratar_eventos(eventos)
@@ -878,12 +971,12 @@ class GameManager:
             
             elif self.tela_atual == "minigame":
                 # fundo (mantém teu background)
-                self.tela.blit(self.fundo_principal, (0, 0))
+                #self.tela.blit(self.fundo_principal, (0, 0))
                 self.tela_minigame.tratar_eventos(eventos)
                 self.tela_minigame.desenhar(self.tela)
 
             elif self.tela_atual == "freelance":
-                self.tela.blit(self.fundo_principal, (0, 0))
+                #self.tela.blit(self.fundo_principal, (0, 0))
                 if self.tela_freelance:
                     self.tela_freelance.tratar_eventos(eventos)
                     self.tela_freelance.desenhar(self.tela)
@@ -895,7 +988,7 @@ class GameManager:
                         self.tela_atual = self._tela_antes_menu 
 
             elif self.tela_atual == "desenvolvimento":
-                self.tela.blit(self.fundo_principal, (0, 0))
+                #self.tela.blit(self.fundo_principal, (0, 0))
                 if self.tela_desenvolvimento:
                     self.tela_desenvolvimento.tratar_eventos(eventos)
                     self.tela_desenvolvimento.desenhar(self.tela)
@@ -906,7 +999,7 @@ class GameManager:
             # Dentro do método executar()
 
             elif self.tela_atual == "menu_intermediario":
-                self.tela.blit(self.fundo_principal, (0, 0))
+                #self.tela.blit(self.fundo_principal, (0, 0))
 
                 if self.tela_intermediario is not None:
                     self.tela_intermediario.tratar_eventos(eventos)
@@ -927,21 +1020,23 @@ class GameManager:
                 self.tela_criar_jogador.atualizar(dt)
                 self.tela_criar_jogador.desenhar(self.tela)
             elif self.tela_atual == "escolha_mg":
-                self.tela.blit(self.fundo_principal, (0, 0))
+                #self.tela.blit(self.fundo_principal, (0, 0))
                 self.tela_escolha_mg.tratar_eventos(eventos)
                 self.tela_escolha_mg.desenhar(self.tela)
 
             elif self.tela_atual in ["introducao", "exercicio", "resultado"]:
                 # fundo
-                self.tela.blit(self.fundo_principal, (0, 0))
+                #self.tela.blit(self.fundo_principal, (0, 0))
 
                 # === HOTSPOT DA PORTA (sair do jogo) ===
+                """
                 self.exit_hotspot.update(
                     int(self.largura * 0.01),  # X
                     int(self.altura  * 0.25),  # Y
                     int(self.largura * 0.06),  # largura
                     int(self.altura  * 0.49)   # altura
                 )
+                """
 
                 if getattr(self, "debug_exit_hotspot", False):
                     eh = self.exit_hotspot
@@ -1047,8 +1142,17 @@ class GameManager:
                 self.tela_loja.tratar_eventos(eventos)
                 self.tela_loja.desenhar(self.tela)
 
-            self.desenhar_barra_curso()
+            if self.jogador_atual and 9 <= self.jogador_atual.get_id_fase() <= 16:
+                itens_andamento = self.loja_service.listar_em_andamento(self.jogador_atual.get_id_jogador())
+                self.hud.desenhar(self.tela, self.jogador_atual, itens_andamento)
 
+
+
+
+            if self.debug_hotspot:
+                pygame.draw.rect(self.tela, (0, 255, 0, 100), self.menu_hotspot, 2) # Desenha contorno verde
+            if self.debug_exit_hotspot:
+                pygame.draw.rect(self.tela, (255, 0, 0, 100), self.exit_hotspot, 2) # Desenha contorno vermelho
             pygame.display.flip()
 
         # ao sair do loop principal
