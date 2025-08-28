@@ -127,7 +127,7 @@ def popular_projetos(projeto_service: ProjetoFreelanceServiceImpl):
         # --- Cliente: Café Aconchego (ID 11) ---
         ProjetoFreelance(None, 11, 'Calculadora de Pedido', 'Calcule o total de um pedido de café e doces.', 'Iniciante', 120.00, 'disponivel', 1, 1, 1, 'Funções', None, 2, 'do_zero', 
                          'def calcular_total(cafe, pao_de_queijo):\n    return 0.0', 
-                         '[{"entrada_funcao": [2, 3], "saida_esperada": "19.5"}]'),
+                         '[{"entrada_funcao": [2, 3], "saida_esperada": "20.5"}]'),
         ProjetoFreelance(None, 11, 'Organizador de Pedidos', 'Use métodos de lista para organizar pedidos por prioridade.', 'Intermediario', 550.00, 'disponivel', 12, 2, 3, 'list methods', None, 5, 'do_zero', 
                          'def organizar_pedidos(pedidos, prioritarios):\n    return []', 
                          '[{"entrada_funcao": [["Café", "Suco", "Chá"], ["Chá", "Suco"]], "saida_esperada": "[\'Chá\', \'Suco\', \'Café\']"}]'),

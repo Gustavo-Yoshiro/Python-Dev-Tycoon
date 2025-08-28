@@ -1135,7 +1135,7 @@ class GameManager:
                         print("DEBUG: Fechando tela freelance")
                         self.tela_freelance = None
                         if hasattr(self, 'ultima_tela_antes_freelance') and self.ultima_tela_antes_freelance:
-                            self.tela_atual = self.ultima_tela_antes_freelance
+                            self.tela_atual = "menu_intermediario"
                             print(f"DEBUG: Voltando para {self.ultima_tela_antes_freelance}")
                         else:
                             self.tela_atual = "menu_intermediario"

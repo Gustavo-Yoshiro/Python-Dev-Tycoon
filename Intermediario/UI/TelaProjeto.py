@@ -78,10 +78,6 @@ class TelaProjeto(Janela):
 
     def desenhar_conteudo(self, tela):
         mouse_pos = pygame.mouse.get_pos()
-        fundo_transparente = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
-        fundo_transparente.fill((20, 20, 30, 180))  # tom escuro com transparência
-        tela.blit(fundo_transparente, self.rect.topleft)
-
         
         # --- Seção 1: Perfil do Cliente (Topo) ---
         area_cliente = pygame.Rect(self.rect.x + 20, self.rect.y + 40, self.rect.width - 40, 64)
