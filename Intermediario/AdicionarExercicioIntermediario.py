@@ -18,7 +18,7 @@ exercicios = [
     Exercicio(id_exercicio=None, id_fase=9,
         dicas="Use f-string e substitua o ponto por vírgula se necessário.",
         pergunta="Dissertativa: Receba um número decimal via input() e exiba no formato R$ valor, com vírgula. Considere que o usuário digita 10.5.",
-        tipo="dissertativa", resposta_certa='R$ 10,50',
+        tipo="dissertativa", resposta_certa='R$ 10.50',
         resposta_erradas=None, entrada_teste='10.5'),
 
     Exercicio(id_exercicio=None, id_fase=9,

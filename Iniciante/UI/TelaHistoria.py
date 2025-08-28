@@ -367,8 +367,13 @@ class TelaHistoria:
         # Botão pulsante
         hover = self.botao_rect.collidepoint(pygame.mouse.get_pos())
         base = self.cor_btn_hover if hover else self.cor_btn
-        pulse = (1 + 0.05 * (1 + math.sin(self._pulse_phase * 3.0)))
-        btn_color = (int(base[0] * pulse), int(base[1] * pulse), int(base[2] * pulse))
+        pulse = 1 + 0.05 * (1 + math.sin(self._pulse_phase * 3.0))  # 1.0 .. 1.1
+
+        r = max(0, min(255, int(base[0] * pulse)))
+        g = max(0, min(255, int(base[1] * pulse)))
+        b = max(0, min(255, int(base[2] * pulse)))
+        btn_color = (r, g, b)
+
         pygame.draw.rect(tela, btn_color, self.botao_rect, border_radius=14)
 
         label = "Começar (Enter)" if (self.idx_pagina == len(self.paginas) - 1 and self._is_page_fully_shown()) else "Continuar (Enter)"

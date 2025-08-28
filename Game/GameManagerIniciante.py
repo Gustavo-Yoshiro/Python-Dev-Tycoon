@@ -585,7 +585,7 @@ class GameManager:
                 int(self.altura  * 0.48)
             )
         else:
-            bg = "assets/TelaJogoIniciante.png"
+            bg = "assets/Personagem_Bebendo_Café_em_Anime.mp4"
         self._set_fundo(bg)
         # <<< FIM TROCA >>>
 
