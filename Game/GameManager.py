@@ -26,7 +26,9 @@ from Intermediario.Utils.sfx_pyfoot import SFXPyFoot
 from Intermediario.Utils.sfx_bug import SFXBug
 from Intermediario.Utils.sfx_cobra import SFXCobra
 from Intermediario.Utils.sfx_hero import SFXHero
-
+#tela historia
+from Iniciante.UI.TelaHistoria import TelaHistoria 
+from Intermediario.UI.TelaHistoriaIntermediario import TelaHistoriaIntermediario
 
 ##### free lancer
 # --- FREELANCER (UI + serviços do Intermediário) ---
@@ -111,6 +113,10 @@ class GameManager:
         self.nome_topico_atual = ""
         self.tempo_inicio_jogo = 0
 
+        #historia intermediario
+        self.tela_historia_inter = None          # NOVO
+        self._hist_inter_shown = False  
+
         # Assets
         self.fundo_principal = pygame.image.load("assets/TelaJogoIniciante.png")
         self.fundo_principal = pygame.transform.scale(self.fundo_principal, (self.largura, self.altura))
@@ -127,6 +133,8 @@ class GameManager:
         )
         self.debug_hotspot = False
         
+        #tela hisotria
+        self.tela_historia = None
 
         # cooldown pra evitar reabrir no mesmo clique
         self._last_closed_at = 0
@@ -177,6 +185,16 @@ class GameManager:
         self._bg_video_size = (self.largura, self.altura)
 
         self.hud = HUDIntermediario(self.largura, self.altura)
+
+
+    def mostrar_historia_intermediario(self):
+        """Abre a história de transição para o Intermediário e, ao confirmar, vai para a introdução da fase."""
+        self.tela_historia_inter = TelaHistoriaIntermediario(
+            self.largura,
+            self.altura,
+            on_confirmar=self.mostrar_introducao  # volta pro fluxo normal
+        )
+        self.tela_atual = "historia_inter"
 
 
     #alem do exit da para usar em outros se precisar
@@ -330,7 +348,40 @@ class GameManager:
         
         # Inicia o jogo
         self.carregar_progresso()
-        self.mostrar_introducao()
+        #self.mostrar_introducao()
+        # A tela de história, ao ser confirmada, chamará self.mostrar_introducao
+        self.tela_historia = TelaHistoria(self.largura, self.altura, on_confirmar=self.mostrar_introducao)
+        self.tela_atual = "historia"
+
+    def _refletir_bonus_conclusao(self, item):
+        try:
+            # ===== Opção A: concluir_item já atualiza o jogador no BD =====
+            # Recarrega o jogador do BD e pronto (HUD atualiza no próximo frame).
+            self.jogador_atual = self.jogador_service.buscar_jogador_por_id(
+                self.jogador_atual.get_id_jogador()
+            )
+            return
+
+            # ===== Opção B: concluir_item NÃO atualiza o jogador no BD =====
+            # (Se for o seu caso, comente o 'return' acima e use este bloco.)
+            cat = (getattr(item, "get_categoria", lambda: "")() or "").lower()
+            bonus = getattr(item, "get_bonus", lambda: 1)()  # se tiver esse método; senão troque por 1
+
+            if   cat == "social":
+                self.jogador_atual.set_social(self.jogador_atual.get_social() + bonus)
+            elif cat == "backend":
+                self.jogador_atual.set_backend(self.jogador_atual.get_backend() + bonus)
+            elif cat == "frontend":
+                self.jogador_atual.set_frontend(self.jogador_atual.get_frontend() + bonus)
+            elif cat == "dinheiro":
+                self.jogador_atual.set_dinheiro(self.jogador_atual.get_dinheiro() + bonus)
+            elif cat == "energia":
+                self.jogador_atual.set_energia(self.jogador_atual.get_energia() + bonus)
+            # acrescente outros atributos que sua loja possa dar
+
+            self.jogador_service.atualizar_jogador(self.jogador_atual)
+        except Exception as e:
+            print("[WARN] Falha ao refletir bônus do item:", e)
 
     def carregar_save(self, save):
         """Carrega um save existente"""
@@ -432,23 +483,23 @@ class GameManager:
         id_fase = self.id_fases[self.fase_atual]
         fase = self.fase_service.buscar_fase_por_id(id_fase)
 
-        # ✅ Blindagem: evita quebrar se a fase não existir no BD (ex.: transição 8→9 sem cadastro)
+        # ✅ Blindagem: evita quebrar se a fase não existir no BD
         if fase is None:
             print(f"[WARN] Fase {id_fase} não encontrada no banco. Encerrando para evitar crash.")
             self.tela_atual = "fim"
             return
-        
+
         # >>> TROCA DE FUNDO AQUI <<<
         if id_fase <= 8:
-            bg = "assets/Personagem_Bebendo_Café_em_Anime.mp4"   # seu vídeo
+            bg = "assets/Personagem_Bebendo_Café_em_Anime.mp4"
             self.exit_hotspot.update(
-            int(self.largura * 0.08),
-            int(self.altura  * 0.28),
-            int(self.largura * 0.05),
-            int(self.altura  * 0.48)
-        )
+                int(self.largura * 0.08),
+                int(self.altura  * 0.28),
+                int(self.largura * 0.05),
+                int(self.altura  * 0.48)
+            )
         else:
-            bg = "assets/TelaJogoIniciante.png"  # sua imagem atual ou outro vídeo se quiser
+            bg = "assets/TelaJogoIniciante.png"
         self._set_fundo(bg)
         # <<< FIM TROCA >>>
 
@@ -457,17 +508,15 @@ class GameManager:
         self.nome_topico_atual = nome_topico
 
         self.tela_introducao = TelaIntroducaoTopico(
-            self.largura,
-            self.altura,
-            nome_topico,
-            descricao,
+            self.largura, self.altura,
+            nome_topico, descricao,
             on_confirmar=self.iniciar_exercicio,
             jogador=self.jogador_atual
         )
         self.tela_atual = "introducao"
-        #self.iniciar_minigame()
         if tela_salva:
             self.tela_exercicio_salva = tela_salva
+
 
 
     def iniciar_exercicio(self):
@@ -811,7 +860,11 @@ class GameManager:
             )
 
             # Vai pra introdução da nova fase
-            self.mostrar_introducao()
+            if proxima_fase_id == 9 and not self._hist_inter_shown:
+                self._hist_inter_shown = True
+                self.mostrar_historia_intermediario()
+            else:
+                self.mostrar_introducao()
         else:
             self.tela_atual = "fim"
 
@@ -916,6 +969,8 @@ class GameManager:
                     if novo_tempo <= 0:
                         self.loja_service.concluir_item(item.get_id_item())
                         print(f"[OK] Item concluído: {item.get_nome()} ({item.get_categoria()})")
+                        # >>> ATUALIZA O JOGADOR EM MEMÓRIA PRA HUD REFLETIR AGORA
+                        self._refletir_bonus_conclusao(item)
                     else:
                         self.loja_service.atualizar_item(item)
             # Trata eventos
@@ -933,6 +988,7 @@ class GameManager:
                     elif self.tela_atual == "menu_intermediario":
                         # se já está no menu, fecha
                         self.fechar_menu_intermediario()
+
                     elif self.tela_atual in ("introducao", "exercicio", "resultado"):
                         if self.is_intermediario():
                             # 9..16 → abre o menu do Intermediário
@@ -962,6 +1018,16 @@ class GameManager:
             if self.tela_atual == "inicio":
                 self.tela_inicio.tratar_eventos(eventos)
                 self.tela_inicio.desenhar(self.tela)
+
+            elif self.tela_atual == "historia":
+                if self.tela_historia:
+                    self.tela_historia.tratar_eventos(eventos)
+                    self.tela_historia.desenhar(self.tela)
+            elif self.tela_atual == "historia_inter":                     # NOVO
+                if self.tela_historia_inter:
+                    self.tela_historia_inter.tratar_eventos(eventos)
+                    self.tela_historia_inter.desenhar(self.tela)
+
 
             elif self.tela_atual == "save":
                 resultado = self.tela_save.tratar_eventos(eventos)

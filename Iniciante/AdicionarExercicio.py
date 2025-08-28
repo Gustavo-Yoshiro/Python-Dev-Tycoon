@@ -4,7 +4,7 @@ from Iniciante.Persistencia.Impl.ExercicioPersistenciaImpl import ExercicioPersi
 exercicios = [
     # ========================== FASE 1: print() ==========================
     Exercicio(id_exercicio=None, id_fase=1,
-        dicas="Dica: O comando mais usado para exibir valores na tela.",
+        dicas="O comando mais usado para exibir valores na tela.",
         pergunta="Qual comando em Python exibe um texto na tela?",
         tipo="objetiva", resposta_certa="print()",
         resposta_erradas="show()|output()|display()"),
@@ -41,7 +41,7 @@ exercicios = [
 
     # ========================== FASE 2: input() ==========================
     Exercicio(id_exercicio=None, id_fase=2,
-        dicas="Dica: Esse comando aguarda o usuário digitar algo.",
+        dicas="Esse comando aguarda o usuário digitar algo.",
         pergunta="Qual comando em Python lê um texto digitado pelo usuário?",
         tipo="objetiva", resposta_certa="input()",
         resposta_erradas="scan()|read()|get()"),
@@ -86,7 +86,7 @@ exercicios = [
 
     # ========================== FASE 3: variáveis ==========================
     Exercicio(id_exercicio=None, id_fase=3,
-        dicas="Dica: Variável inteira não tem aspas.",
+        dicas="Variável inteira não tem aspas.",
         pergunta="Qual linha cria uma variável inteira chamada idade?",
         tipo="objetiva", resposta_certa="idade = 20",
         resposta_erradas='idade = "20"|int idade = 20|let idade = 20'),

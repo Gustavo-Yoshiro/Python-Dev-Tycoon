@@ -141,6 +141,233 @@ class TelaExercicio:
             linhas = linhas[:max_linhas-1] + ["..."]
         return fonte, linhas
 
+    def _feedback_objetiva(self, exercicio, alternativa_escolhida: str) -> str:
+        """
+        Explica por que a alternativa escolhida está certa/errada.
+        NUNCA revela a correta quando a escolha está errada.
+        Cobre todas as questões objetivas das fases 1..8 (iniciante).
+        """
+        q = (exercicio.get_pergunta() or "").lower().strip()
+        a = (alternativa_escolhida or "").strip()
+
+        # Helper para comparação tolerante a espaços/maíusculas
+        def _eq(opt: str) -> bool:
+            return ' '.join(a.lower().split()) == ' '.join(opt.lower().split())
+
+        # ========================== FASE 1: print() ==========================
+        if "exibe um texto na tela" in q:
+            if _eq("print()"):          return "Correta: é a função padrão do Python para exibir valores."
+            if _eq("show()"):           return "Errada: 'show()' não é função nativa do Python."
+            if _eq("output()"):         return "Errada: 'output()' não existe no Python padrão."
+            if _eq("display()"):        return "Errada: 'display()' é de ambientes como IPython/Jupyter, não o print padrão."
+            return "Revise o comando usado para exibir valores na tela com Python."
+
+        if "resultado de 5 + 3" in q:
+            if _eq("print(5 + 3)"):     return "Correta: a expressão é avaliada e o resultado (8) é impresso."
+            if _eq('print("5 + 3")'):   return "Errada: entre aspas é texto literal; não calcula a soma."
+            if _eq("print(5,+,3)"):     return "Errada: isso não é sintaxe válida do Python."
+            if _eq("print(8)"):         return "Parcial: imprime 8, mas não mostra o cálculo solicitado."
+            return "Revise: para mostrar o resultado de uma expressão, imprima a expressão, não uma string."
+
+        # ========================== FASE 2: input() ==========================
+        if "lê um texto digitado pelo usuário" in q:
+            if _eq("input()"):          return "Correta: lê uma string digitada pelo usuário."
+            if _eq("scan()"):           return "Errada: não é função do Python padrão."
+            if _eq("read()"):           return "Errada: não é a função usada para entrada pelo teclado em Python."
+            if _eq("get()"):            return "Errada: não é a função padrão para leitura de entrada em Python."
+            return "Revise o comando padrão de leitura pelo teclado em Python."
+
+        if "guarda o nome digitado" in q:
+            if _eq('nome = input("Digite seu nome: ")'): return "Correta: lê a entrada e atribui à variável."
+            if _eq("input(nome)"):                      return "Errada: usa 'nome' como mensagem; não atribui o valor lido."
+            if _eq("nome == input()"):                  return "Errada: '==' compara; para guardar é necessário '='."
+            if _eq('input("Digite seu nome: ") = nome'):return "Errada: ordem de atribuição invertida em Python."
+            return "Revise a diferença entre atribuição (=) e comparação (==)."
+
+        # ========================== FASE 3: variáveis ==========================
+        if "variável inteira chamada idade" in q:
+            if _eq("idade = 20"):       return "Correta: inteiro sem aspas representa número."
+            if _eq('idade = "20"'):     return "Errada: com aspas vira string, não inteiro."
+            if _eq("int idade = 20"):   return "Errada: isso é sintaxe de C/Java, não de Python."
+            if _eq("let idade = 20"):   return "Errada: 'let' não existe em Python."
+            return "Revise a sintaxe de atribuição e tipos (int vs string)."
+
+        if "variável chamada cidade com valor 'são paulo'" in q:
+            if _eq("cidade = 'São Paulo'"): return "Correta: atribuição literal de string."
+            if _eq("cidade == 'São Paulo'"):return "Errada: '==' faz comparação, não atribuição."
+            if _eq("let cidade = 'São Paulo'"): return "Errada: 'let' não existe no Python."
+            if _eq("cidade := 'São Paulo'"):   return "Errada: ':=' (walrus) não é para atribuição normal."
+            return "Revise: atribuição usa '=' e strings precisam de aspas."
+
+        # ========================== FASE 4: Operadores ==========================
+        if "verifica igualdade" in q:
+            if _eq("=="):               return "Correta: '==' compara se os valores são iguais."
+            if _eq("="):                return "Errada: '=' faz atribuição."
+            if _eq("!="):               return "Errada: esse operador significa 'diferente de'."
+            if _eq("=>"):               return "Errada: operador inválido em Python."
+            return "Revise os operadores de comparação do Python."
+
+        if "usado para 'diferente de'" in q or "diferente de" in q:
+            if _eq("!="):               return "Correta: indica desigualdade."
+            if _eq("=/="):              return "Errada: não é operador do Python."
+            if _eq("=="):               return "Errada: esse é o operador de igualdade."
+            if _eq("<>"):               return "Errada: era do Python 2; não é usado no Python 3."
+            return "Revise o operador de desigualdade do Python."
+
+        if "resultado de 3 + 2 * 2" in q:
+            if _eq("7"):                return "Correta: multiplicação tem precedência sobre soma."
+            if _eq("10") or _eq("9") or _eq("12"):
+                return "Errada: lembre que * e / têm precedência sobre + e -; use parênteses se precisar mudar a ordem."
+            return "Revise a ordem de precedência dos operadores."
+
+        # ========================== FASE 5: If/Else ==========================
+        if "qual destas estruturas é correta" in q:
+            if _eq("if x > 10: print(x)"):             return "Correta: usa dois-pontos e indentação, como pede o Python."
+            if _eq("if x > 10 then print(x)"):         return "Errada: 'then' não faz parte da sintaxe do Python."
+            if _eq("if (x > 10) { print(x) }"):        return "Errada: chaves não são usadas para blocos em Python."
+            if _eq("if x > 10 do print(x)"):           return "Errada: 'do' não existe nessa construção em Python."
+            return "Revise a sintaxe de if/elif/else no Python (dois-pontos e indentação)."
+
+        if "como se escreve o bloco else" in q:
+            if _eq("else:"):            return "Correta: bloco else termina com dois-pontos."
+            if _eq("else"):             return "Errada: falta ':' ao final."
+            if _eq("else {}"):          return "Errada: Python não usa chaves para blocos."
+            if _eq("else then:"):       return "Errada: 'then' não é parte da sintaxe do Python."
+            return "Revise a estrutura de blocos com dois-pontos e indentação."
+
+        # ========================== FASE 6: For ==========================
+        if "imprime os números de 1 a 3" in q:
+            if _eq("for i in range(1, 4): print(i)"):  return "Correta: range(1,4) gera 1, 2 e 3."
+            if _eq("for i = 1 to 3: print(i)"):        return "Errada: essa sintaxe não é Python."
+            if _eq("for i in 1..3: print(i)"):         return "Errada: intervalo '1..3' não existe em Python."
+            if _eq("for (i = 1; i <= 3; i++): print(i)"): return "Errada: isso é estilo C; Python usa 'for ... in ...'."
+            return "Revise como o range funciona e a sintaxe do for em Python."
+
+        if "faz o corpo executar exatamente 5 vezes" in q:
+            if _eq("for i in range(5):"):              return "Correta: range(5) produz 5 iterações (0..4)."
+            if _eq("for i in 5:"):                     return "Errada: inteiros não são iteráveis."
+            if _eq("for i in range(1,5):"):            return "Errada: executa 4 vezes (1,2,3,4)."
+            if _eq("for i = 1 to 5:"):                 return "Errada: essa sintaxe não é do Python."
+            return "Revise a assinatura de range e contagem de iterações."
+
+        # ========================== FASE 7: While ==========================
+        if ("o que faz este código?" in q and "while x <=" in q) or ("x = 1 while x <=" in q):
+            if _eq("Imprime 1, 2 e 3"):               return "Correta: imprime e incrementa até x ultrapassar 3."
+            if _eq("Não faz nada"):                    return "Errada: há um laço que imprime valores."
+            if _eq("Imprime infinitamente"):          return "Errada: como x é incrementado, o laço termina."
+            if _eq("Erro de sintaxe"):                return "Errada: com quebras/indentação corretas, o código é válido."
+            return "Revise a mecânica do while: condição, corpo e incremento."
+
+        if "como sair do laço antes do fim" in q:
+            if _eq("break"):                           return "Correta: encerra o laço imediatamente."
+            if _eq("stop"):                            return "Errada: 'stop' não é comando do Python."
+            if _eq("end"):                             return "Errada: 'end' não encerra laço em Python."
+            if _eq("exit"):                            return "Errada: 'exit' não é o comando apropriado para sair do laço."
+            return "Revise os comandos de controle de laço (break/continue)."
+
+        # ========================== FASE 8: Funções ==========================
+        if "qual comando define uma função" in q or "define uma função em python" in q:
+            if _eq("def soma(a, b):"):                 return "Correta: 'def nome(parâmetros):' é a sintaxe correta."
+            if _eq("function soma(a, b):"):            return "Errada: 'function' não é usado em Python."
+            if _eq("def soma(a, b) end"):              return "Errada: 'end' não fecha blocos em Python; usa-se indentação."
+            if _eq("func soma(a, b):"):                return "Errada: 'func' não é palavra-chave do Python."
+            return "Revise a palavra-chave 'def' e o uso de dois-pontos com indentação."
+
+        if "retorna o dobro de x" in q:
+            if _eq("def dobro(x): return x * 2"):      return "Correta: a função retorna o resultado calculado."
+            if _eq("def dobro(x): print(x * 2)"):      return "Errada: 'print' só exibe; a questão pede retorno."
+            if _eq("def dobro(): return x * 2"):       return "Errada: falta o parâmetro 'x'."
+            if _eq("function dobro(x): return x * 2"):  return "Errada: 'function' não é sintaxe do Python."
+            return "Revise: retornar valor usa 'return', e parâmetros devem estar na assinatura."
+
+        # ========================== GENÉRICO (não revelar correta) ==========================
+        # Se chegou aqui, a questão NÃO é uma das objetivas do iniciante mapeadas.
+        # Damos um conselho neutro sem revelar a alternativa correta.
+        return "Revise o conteúdo do tópico e a sintaxe do Python para essa situação."
+
+        # --- FASE 9: f-strings ---
+        if "usa f-string corretamente" in q:
+            if a == 'print(f"Olá, {nome}")': return "Correta: f antes da string e {nome} para interpolar."
+            if a == 'print("Olá, {nome}")':  return "Errada: sem f a chave não é interpolada."
+            if a == 'print(f"Olá, nome")':   return "Errada: imprime a palavra 'nome'."
+            if a == 'print("fOlá, {nome}")': return "Errada: o f está dentro das aspas."
+        if "duas casas decimais usando f-string" in q:
+            if a == 'print(f"Preço: {preco:.2f}")': return "Correta: :.2f formata com 2 casas."
+            return "Errada: a sintaxe de formatação está incorreta."
+
+        # --- FASE 10: métodos de string ---
+        if "todo o texto em maiúsculas" in q:
+            if a == "upper()":      return "Correta: s.upper()."
+            if a == "capitalize()": return "Errada: só a 1ª letra da frase."
+            if a == "title()":      return "Errada: 1ª letra de cada palavra."
+            if a == "max()":        return "Errada: não é método de string."
+        if "divide a string em uma lista de palavras" in q:
+            if a == "split()":      return "Correta: separa por espaços por padrão."
+            if a == "join()":       return "Errada: faz o inverso (junta)."
+            if a == "replace()":    return "Errada: troca trechos."
+            if a == "separate()":   return "Errada: não existe."
+
+        # --- FASE 11: listas ---
+        if "adiciona um item ao final da lista" in q:
+            if a == "append()": return "Correta: lista.append(x)."
+            if a == "add()":    return "Errada: add() é de set."
+            if a == "push()":   return "Errada: estilo de outras linguagens."
+            if a == "insert()": return "Errada: insert() precisa de índice."
+        if "ordena a lista em ordem crescente" in q:
+            if a == "sort()":   return "Correta: lista.sort() ordena in-place."
+            if a == "order()":  return "Errada: não existe."
+            if a == "reverse()":return "Errada: só inverte."
+            if a == "sorted()": return "Parcial: sorted(lista) retorna NOVA lista; a pergunta pediu método da lista."
+
+        # --- FASE 12: tuplas ---
+        if "cria uma tupla com 1 e 2" in q:
+            if a == "(1, 2)": return "Correta: tupla usa parênteses."
+            return "Errada: [] é lista, {} é set/dict."
+        if "conta quantas vezes um valor aparece" in q:
+            if a == "count()": return "Correta: t.count(valor)."
+            return "Errada: métodos/nome incorretos."
+
+        # --- FASE 13: conjuntos (set) ---
+        if "cria um conjunto com 1,2,3" in q:
+            if a == "{1, 2, 3}": return "Correta: chaves com elementos únicos."
+            return "Errada: [] é lista, () é tupla."
+        if "união de dois conjuntos" in q:
+            if a == "|": return "Correta: A | B é união."
+            if a == "&": return "Errada: '&' é interseção."
+            if a == "-": return "Errada: '-' é diferença."
+            if a == "+": return "Errada: '+' não é definido para set."
+
+        # --- FASE 14: dicionários ---
+        if "cria dicionário com nome='ana'" in q:
+            if a == "{'nome': 'Ana'}": return "Correta: {'chave': valor}."
+            if a == "{nome: 'Ana'}":   return "Errada: chave sem aspas vira variável (NameError)."
+            if a == "[nome:'Ana']":    return "Errada: colchetes não definem dict."
+            if a == "dict(nome='Ana')":return "Parcial: funciona, mas foi pedida a sintaxe literal com chaves."
+        if "retorna as chaves de um dicionário" in q:
+            if a == "keys()":   return "Correta: d.keys()."
+            if a == "values()": return "Errada: retorna valores."
+            if a == "items()":  return "Errada: retorna pares (chave, valor)."
+            if a == "get_keys()":return "Errada: não existe."
+
+        # --- FASE 15: list comprehensions ---
+        if "cria lista de 0 a 4" in q:
+            if a == "[x for x in range(5)]": return "Correta: gera 0..4."
+            return "Errada: sintaxe de comprehension incorreta."
+        if "números pares até 5" in q:
+            if a == "[x for x in range(6) if x % 2 == 0]": return "Correta: filtra pares em 0..5."
+            return "Errada: posição do 'if' e/ou sintaxe incorreta."
+
+        # --- FASE 16: try/except ---
+        if "inicia um bloco de tratamento de erros" in q:
+            if a == "try": return "Correta: bloco try/except."
+            return "Errada: 'catch' não é Python; 'except' não inicia bloco."
+        if "captura especificamente valueerror" in q:
+            if a == "except ValueError:": return "Correta: captura ValueError."
+            return "Errada: sintaxe correta é 'except TipoDeErro:' com dois-pontos."
+
+        # Fallback genérico
+        return f"Alternativa correta: {correta}"
+
     def centralizar_prompt(self):
         self.rect_prompt.x = int(self.largura * 0.25)
         self.rect_prompt.y = int(self.altura * 0.13)
@@ -315,7 +542,7 @@ class TelaExercicio:
             for l_fb in linhas_fb:
                 tela.blit(fonte_fb.render(l_fb, True, cor), (feedback_x, y_fb))
                 y_fb += fonte_fb.get_height()
-            if "Saída:" in self.resultado:
+            if ("Saída:" in self.resultado) or ("Feedback:" in self.resultado):
                 icon_x = feedback_x + sum(fonte_fb.size(l)[0] for l in linhas_fb) + 18
                 icon_rect = pygame.Rect(icon_x, feedback_y, 24, 24)
                 pygame.draw.circle(tela, (100, 180, 255), icon_rect.center, 12)
@@ -339,33 +566,89 @@ class TelaExercicio:
 
         # --- Popup de saída (dissertativa)
         if self.popup_saida:
-            largura, altura = 520, 350
+            # popup maior
+            largura, altura = 640, 420
             popup_x = self.largura // 2 - largura // 2
             popup_y = self.altura // 2 - altura // 2
-            surf = pygame.Surface((largura, altura), pygame.SRCALPHA)
-            pygame.draw.rect(surf, (30, 44, 70, 232), (0,0,largura,altura), border_radius=20)
-            pygame.draw.rect(surf, (120,180,255), (0,0,largura,altura), 3, border_radius=20)
-            surf.blit(self.fonte.render("Saída do seu código:", True, (230,230,90)), (20, 20))
 
-            saida = self.resultado.split("Saída:",1)[-1].replace("\r\n","\n").replace("\r","\n").replace("\t", "    ").strip()
-            saida = ''.join(c if c.isprintable() or c in "\n" else '?' for c in saida)
-            linhas = []
-            for linha in saida.split("\n"):
-                linhas += self.quebrar_texto(linha, self.fonte_pequena, largura-40)
-            y_popup = 65
-            for linha in linhas[:12]:
-                surf.blit(self.fonte_pequena.render(linha, True, (230,230,230)), (18, y_popup))
-                y_popup += 24
-            if len(linhas) > 12:
-                surf.blit(self.fonte_pequena.render("[...]", True, (220,180,180)), (18, y_popup))
-            btn_rect = pygame.Rect(largura-90, altura-46, 76, 34)
+            surf = pygame.Surface((largura, altura), pygame.SRCALPHA)
+            pygame.draw.rect(surf, (30, 44, 70, 232), (0, 0, largura, altura), border_radius=20)
+            pygame.draw.rect(surf, (120, 180, 255), (0, 0, largura, altura), 3, border_radius=20)
+
+            # --- Cabeçalho
+            surf.blit(self.fonte.render("Detalhes:", True, (230, 230, 90)), (20, 20))
+
+            # --- Extrai blocos (Feedback e/ou Saída), sem se misturar
+            conteudo_feedback = None
+            conteudo_saida = None
+
+            if "Feedback:" in self.resultado:
+                after = self.resultado.split("Feedback:", 1)[-1]
+                # se também existir "Saída:" depois, corta aqui para não misturar
+                if "Saída:" in after:
+                    after = after.split("Saída:", 1)[0]
+                conteudo_feedback = after
+
+            if "Saída:" in self.resultado:
+                conteudo_saida = self.resultado.split("Saída:", 1)[-1]
+
+            sections = []
+            if conteudo_feedback and conteudo_feedback.strip():
+                sections.append(("Feedback", conteudo_feedback))
+            if conteudo_saida and conteudo_saida.strip():
+                sections.append(("Saída", conteudo_saida))
+
+            if not sections:
+                sections = [("Detalhes", "Sem detalhes disponíveis.")]
+
+            # --- Render do conteúdo
+            def _sanitize(txt: str) -> str:
+                txt = (txt or "").replace("\r\n", "\n").replace("\r", "\n").replace("\t", "    ")
+                # mantém quebras de linha e substitui caracteres não imprimíveis
+                return ''.join(c if c.isprintable() or c in "\n" else '?' for c in txt)
+
+            y_popup = 66
+            max_lines = 18  # limite visível, depois mostramos [...]
+            line_count = 0
+
+            for titulo_sec, texto in sections:
+                # título da seção
+                sec_title = f"{titulo_sec}:"
+                surf.blit(self.fonte_pequena.render(sec_title, True, (230, 230, 120)), (18, y_popup))
+                y_popup += 28
+
+                texto = _sanitize(texto)
+                # quebra por linhas e faz word-wrap em cada linha
+                for linha in texto.split("\n"):
+                    if line_count >= max_lines:
+                        break
+                    wraps = self.quebrar_texto(linha, self.fonte_pequena, largura - 40)
+                    for wl in wraps:
+                        if line_count >= max_lines:
+                            break
+                        surf.blit(self.fonte_pequena.render(wl, True, (230, 230, 230)), (18, y_popup))
+                        y_popup += 22
+                        line_count += 1
+                if line_count >= max_lines:
+                    break
+
+                y_popup += 6  # respiro entre seções
+
+            if line_count >= max_lines:
+                surf.blit(self.fonte_pequena.render("[...]", True, (220, 180, 180)), (18, y_popup))
+
+            # --- Botão FECHAR
+            btn_rect = pygame.Rect(largura - 100, altura - 50, 86, 36)
             pygame.draw.rect(surf, (255, 90, 90), btn_rect, border_radius=12)
-            fechar_label = self.fonte_pequena.render("FECHAR", True, (255,255,255))
-            surf.blit(fechar_label, (btn_rect.x+10, btn_rect.y+5))
+            fechar_label = self.fonte_pequena.render("FECHAR", True, (255, 255, 255))
+            surf.blit(fechar_label, (btn_rect.x + (btn_rect.w - fechar_label.get_width()) // 2,
+                                    btn_rect.y + (btn_rect.h - fechar_label.get_height()) // 2))
+
             tela.blit(surf, (popup_x, popup_y))
-            self._popup_btn_rect = pygame.Rect(popup_x+btn_rect.x, popup_y+btn_rect.y, btn_rect.w, btn_rect.h)
+            self._popup_btn_rect = pygame.Rect(popup_x + btn_rect.x, popup_y + btn_rect.y, btn_rect.w, btn_rect.h)
         else:
             self._popup_btn_rect = None
+
 
     # --------------------- Envio/validação ---------------------
     def pode_enviar(self):
@@ -393,8 +676,13 @@ class TelaExercicio:
             if resposta is None:
                 self.resultado = "Resposta Incorreta!"
                 return False
+
             correta = (resposta.strip().lower() == correta_txt)
-            self.resultado = "Resposta Correta!" if correta else "Resposta Incorreta!"
+
+            # Gera texto de explicação (sem destacar nada na UI)
+            explic = self._feedback_objetiva(self.exercicio_selecionado, resposta)
+            base = "Resposta Correta!" if correta else "Resposta Incorreta!"
+            self.resultado = base + (f"\nFeedback: {explic}" if explic else "")
             return correta
 
         elif tipo == "dragdrop":
